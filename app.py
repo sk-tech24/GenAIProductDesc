@@ -1,4 +1,4 @@
-# 📦 Streamlit Product Info Scraper App (Hugging Face MVP with Cohere Summary)
+# 📦 Streamlit Product Info Scraper App (SEO-Optimized + Humanized)
 
 import streamlit as st
 import asyncio
@@ -11,20 +11,19 @@ import aiohttp
 import requests
 from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, disable_caching
 from humanize_ai_text import HumanizedAI
+from seoanalyzer import analyze
+from textstat import flesch_reading_ease
 
+# 🚀 Setup
 os.system("playwright install")
 
-# Load environment variables for API keys
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 HUMANIZE_API_KEY = os.getenv("HUMANIZE_API_KEY")
 humanizer = HumanizedAI(api_key=HUMANIZE_API_KEY)
 co = cohere.Client(COHERE_API_KEY)
-
-# Disable datasets caching to avoid read-only FS issues on HF Spaces
-# disable_caching()
 HF_DATASET_NAME = "Jay-Rajput/product_desc"
 
-# 1. 🔍 Google Search via Playwright
+# 🔍 Google Search
 async def search_product_links(query, max_links=5):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -45,7 +44,7 @@ async def search_product_links(query, max_links=5):
         await browser.close()
         return links
 
-# 2. 🕷️ Async Scraper with Robust Validation
+# 🕷️ Scraper
 async def extract_product_info(session, url):
     try:
         async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10) as response:
@@ -57,7 +56,6 @@ async def extract_product_info(session, url):
             paragraphs = soup.find_all("p")
             body_text = " ".join([p.text.strip() for p in paragraphs[:15] if len(p.text.strip()) > 30])
 
-            # ✅ Validation rules to ensure it's a product page
             keywords = ["price", "buy", "add to cart", "mrp", "product", "brand", "description"]
             combined_text = f"{title.lower()} {short_desc.lower()} {body_text.lower()}"
             keyword_matches = sum(1 for word in keywords if word in combined_text)
@@ -74,25 +72,23 @@ async def extract_product_info(session, url):
     except Exception as e:
         return {"url": url, "error": str(e)}
 
-# 3. 🧠 Generate AI Description with Consistent Structure
+# 🧠 Generate SEO-Friendly Description
 async def generate_aggregated_description(product_name, descriptions):
     combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
     prompt = f"""
-You are a professional product copywriter. Based on the following product descriptions from various websites, write a single human-like, emotionally engaging, and informative product description for "{product_name}".
+You are a professional SEO product copywriter. Write a single long product description for "{product_name}" using the info below. Make it sound human, engaging, and optimized for search engines.
 
-📌 Guidelines:
-- Start with a **short description** (overview).
-- Merge all **key features** into the main product description without a heading.
-- Add a **How to Use** section.
-- End the product description with any concluding insights — as a continuation of the main paragraph.
-- Do NOT use subheadings like 'Conclusion' or 'Key Features'.
-- Maintain a friendly, conversational tone like a real human would write.
-- Format using **markdown** (e.g., bold titles).
-- Keep it under 800 words.
+**Guidelines:**
+- Start with a short overview.
+- Integrate key features directly into the body.
+- Include a clear 'How to Use' section.
+- Include natural conclusion merged into the main content.
+- Use markdown formatting.
+- Avoid headings like 'Conclusion' or 'Key Features'.
+- Include relevant keywords naturally (like brand, use-case, product category).
+- Use emotional, benefit-driven language.
 
 {combined_texts}
-
-Return only the final formatted product description.
 """
     try:
         response = co.chat(model="command-r-plus-08-2024", message=prompt)
@@ -100,16 +96,27 @@ Return only the final formatted product description.
     except Exception as e:
         return f"Error generating summary: {str(e)}"
 
-# 4. 🤖 Humanize with HumanizedAI
+# 🤖 Humanize AI Output
 
 def humanize_text(text):
     try:
         result = humanizer.run(text)
         return result['humanizedText']
     except Exception as e:
-        return text  # fallback
+        return text
 
-# 5. 💾 Save to Hugging Face Dataset
+# 🔍 SEO Score
+
+def get_seo_score(text):
+    try:
+        report = analyze(text, url=None)
+        score = flesch_reading_ease(text)
+        return score
+    except:
+        return None
+
+# 💾 Save to HF Dataset
+
 def save_to_huggingface_dataset(product_name, description):
     new_data = Dataset.from_dict({
         "product_name": [product_name],
@@ -123,7 +130,7 @@ def save_to_huggingface_dataset(product_name, description):
 
     combined.push_to_hub(HF_DATASET_NAME, split="train", private=False)
 
-# 6. 🚀 Streamlit Async Wrapper
+# 🚀 Streamlit UI
 st.title("🛍️ ProductSense: Smart Product Descriptions")
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
@@ -153,12 +160,16 @@ if st.session_state.submitted and product_name:
 
             ai_summary = await generate_aggregated_description(product_name, descriptions)
             human_like_summary = humanize_text(ai_summary)
+            seo_score = get_seo_score(human_like_summary)
             save_to_huggingface_dataset(product_name, human_like_summary)
-            return human_like_summary, metadata
+            return human_like_summary, metadata, seo_score
 
-    summary, sources = asyncio.run(run())
+    summary, sources, seo_score = asyncio.run(run())
     st.subheader("📝 Final Product Description")
     st.write(summary)
+
+    # if seo_score:
+    #     st.markdown(f"📈 **SEO Readability Score**: {round(seo_score, 2)}")
 
     # st.subheader("🔗 Sources Used")
     # for result in sources:
@@ -172,5 +183,4 @@ if st.session_state.submitted and product_name:
     #         display_title = title if title else "🔗 View Page"
     #         st.markdown(f"[**{display_title}**]({url})")
 
-    # Reset state to allow new input
     st.session_state.submitted = False
