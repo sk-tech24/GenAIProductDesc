@@ -10,12 +10,14 @@ import re
 import aiohttp
 import requests
 from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, disable_caching
+from humanize_ai_text import HumanizedAI
 
 os.system("playwright install")
 
 # Load environment variables for API keys
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-HF_API_TOKEN = os.getenv("HF_API_TOKEN")
+HUMANIZE_API_KEY = os.getenv("HUMANIZE_API_KEY")
+humanizer = HumanizedAI(api_key=HUMANIZE_API_KEY)
 co = cohere.Client(COHERE_API_KEY)
 
 # Disable datasets caching to avoid read-only FS issues on HF Spaces
@@ -72,7 +74,7 @@ async def extract_product_info(session, url):
     except Exception as e:
         return {"url": url, "error": str(e)}
 
-# 3. 🧠 Aggregate and Summarize with Cohere
+# 3. 🧠 Generate AI Description with Consistent Structure
 async def generate_aggregated_description(product_name, descriptions):
     combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
     prompt = f"""
@@ -98,30 +100,14 @@ Return only the final formatted product description.
     except Exception as e:
         return f"Error generating summary: {str(e)}"
 
-# 4. 🤖 Optional Paraphrasing with Hugging Face
+# 4. 🤖 Humanize with HumanizedAI
 
-def paraphrase_with_huggingface(text):
-    api_url = "https://api-inference.huggingface.co/models/tuner007/pegasus_paraphrase"
-    headers = {
-        "Authorization": f"Bearer {HF_API_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "inputs": text,
-        "parameters": {
-            "num_return_sequences": 1,
-            "num_beams": 5
-        }
-    }
-
+def humanize_text(text):
     try:
-        response = requests.post(api_url, headers=headers, json=payload)
-        if response.status_code == 200:
-            return response.json()[0]["generated_text"]
-        else:
-            return text  # fallback to original
+        result = humanizer.run(text)
+        return result['humanizedText']
     except Exception as e:
-        return text
+        return text  # fallback
 
 # 5. 💾 Save to Hugging Face Dataset
 def save_to_huggingface_dataset(product_name, description):
@@ -139,9 +125,17 @@ def save_to_huggingface_dataset(product_name, description):
 
 # 6. 🚀 Streamlit Async Wrapper
 st.title("🛍️ ProductSense: Smart Product Descriptions")
-product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
 
-if product_name:
+with st.form("product_form"):
+    product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
+    submitted = st.form_submit_button("Generate")
+
+if submitted:
+    st.session_state.submitted = True
+
+if st.session_state.submitted and product_name:
     async def run():
         with st.spinner("Searching and scraping..."):
             urls = await search_product_links(product_name, max_links=5)
@@ -157,8 +151,8 @@ if product_name:
                     else:
                         metadata.append(raw)
 
-            final_summary = await generate_aggregated_description(product_name, descriptions)
-            human_like_summary = paraphrase_with_huggingface(final_summary)
+            ai_summary = await generate_aggregated_description(product_name, descriptions)
+            human_like_summary = humanize_text(ai_summary)
             save_to_huggingface_dataset(product_name, human_like_summary)
             return human_like_summary, metadata
 
@@ -177,3 +171,6 @@ if product_name:
     #     else:
     #         display_title = title if title else "🔗 View Page"
     #         st.markdown(f"[**{display_title}**]({url})")
+
+    # Reset state to allow new input
+    st.session_state.submitted = False
