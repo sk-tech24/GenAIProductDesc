@@ -10,6 +10,11 @@ import re
 import aiohttp
 import requests
 from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, disable_caching
+import google.generativeai as genai
+import os
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
 
 # 🚀 Setup
 os.system("playwright install")
@@ -99,17 +104,24 @@ async def generate_aggregated_description(product_name, descriptions):
     except Exception as e:
         return f"Error generating summary: {str(e)}"
 
-# # 🤖 Humanize AI Output
+def build_humanizer_prompt(ai_description):
+    return f"""
+You are a professional copywriter. Rewrite the following product description to sound natural, engaging, SEO-friendly, and written by a human. Avoid repetition and keep formatting intact. Improve flow, vocabulary, and style:
 
-# def humanize_text(text):
-#     try:
-#         result = humanizer.run(text)
-#         return result['humanizedText']
-#     except Exception as e:
-#         return text
+{ai_description}
+"""
 
+# 🤖 Humanize AI Output
+def humanize_text_with_gemini(text):
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt_text = build_humanizer_prompt(text)
+        response = model.generate_content(prompt_text)
+        return response.text
+    except Exception as e:
+        return f"[ERROR]: {str(e)}"
+    
 # 💾 Save to HF Dataset
-
 def save_to_huggingface_dataset(product_name, description):
     new_data = Dataset.from_dict({
         "product_name": [product_name],
@@ -151,10 +163,10 @@ if st.session_state.submitted and product_name:
                     else:
                         metadata.append(raw)
 
-            summary = await generate_aggregated_description(product_name, descriptions)
-            # human_like_summary = humanize_text(ai_summary)
-            save_to_huggingface_dataset(product_name, summary)
-            return summary, metadata
+            ai_summary = await generate_aggregated_description(product_name, descriptions)
+            human_like_summary = humanize_text_with_gemini(ai_summary)
+            save_to_huggingface_dataset(product_name, human_like_summary)
+            return human_like_summary, metadata
 
     summary, sources = asyncio.run(run())
     st.subheader("📝 Final Product Description")

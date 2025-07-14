@@ -6,3 +6,4 @@ aiohttp
 datasets
 huggingface_hub
 humanize-ai-text
+google-generativeai
