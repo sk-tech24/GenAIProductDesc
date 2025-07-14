@@ -1,0 +1,7 @@
+streamlit
+cohere
+beautifulsoup4
+playwright
+aiohttp
+datasets
+huggingface_hub
