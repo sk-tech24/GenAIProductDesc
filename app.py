@@ -77,7 +77,7 @@ async def generate_aggregated_description(product_name, descriptions):
     combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
     prompt = f"""
     Use the dependency grammar linguistic framework rather than phrase structure grammar to craft a product description. The idea is that the closer together each pair of words you're connecting is, the easier the copy will be to comprehend. Here is the topic and additional details: 
-    You are a professional SEO product copywriter. Based on the following descriptions for "{product_name}", generate one long, SEO-optimized, and human-sounding product description.
+    Based on the following descriptions for "{product_name}", generate one product description.
 
     Strictly follow this format:
 
@@ -88,13 +88,11 @@ async def generate_aggregated_description(product_name, descriptions):
     [Combine all key features and conclusion into this section. Avoid adding any headers inside.]
 
     ### How to Use:
-    [Step-by-step usage instructions in natural tone]
+    [Step-by-step usage instructions]
 
     Guidelines:
     - Do NOT use any extra headers like 'Key Features' or 'Conclusion'
     - Use markdown formatting exactly as shown
-    - Make it emotional, benefit-focused, and clear
-    - Naturally embed relevant keywords (brand name, use-case, etc.)
     - Avoid repetition
 
     Descriptions from sources:
