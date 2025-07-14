@@ -10,16 +10,11 @@ import re
 import aiohttp
 import requests
 from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, disable_caching
-from humanize_ai_text import HumanizedAI
-from seoanalyzer import analyze
-from textstat import flesch_reading_ease
 
 # 🚀 Setup
 os.system("playwright install")
 
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-HUMANIZE_API_KEY = os.getenv("HUMANIZE_API_KEY")
-humanizer = HumanizedAI(api_key=HUMANIZE_API_KEY)
 co = cohere.Client(COHERE_API_KEY)
 HF_DATASET_NAME = "Jay-Rajput/product_desc"
 
