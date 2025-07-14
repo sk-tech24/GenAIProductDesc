@@ -137,14 +137,14 @@ if product_name:
     st.subheader("📝 Final Product Description")
     st.write(summary)
 
-    st.subheader("🔗 Sources Used")
-    for result in sources:
-        url = result.get("url", "")
-        title = result.get("title", "").strip()
-        error = result.get("error")
+    # st.subheader("🔗 Sources Used")
+    # for result in sources:
+    #     url = result.get("url", "")
+    #     title = result.get("title", "").strip()
+    #     error = result.get("error")
 
-        if error:
-            st.warning(f"❌ {url} — {error}")
-        else:
-            display_title = title if title else "🔗 View Page"
-            st.markdown(f"[**{display_title}**]({url})")
+    #     if error:
+    #         st.warning(f"❌ {url} — {error}")
+    #     else:
+    #         display_title = title if title else "🔗 View Page"
+    #         st.markdown(f"[**{display_title}**]({url})")
