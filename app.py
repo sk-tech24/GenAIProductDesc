@@ -8,13 +8,14 @@ import os
 import cohere
 import re
 import aiohttp
+import requests
 from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, disable_caching
-
 
 os.system("playwright install")
 
 # Load environment variables for API keys
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+HF_API_TOKEN = os.getenv("HF_API_TOKEN")
 co = cohere.Client(COHERE_API_KEY)
 
 # Disable datasets caching to avoid read-only FS issues on HF Spaces
@@ -58,7 +59,7 @@ async def extract_product_info(session, url):
             keywords = ["price", "buy", "add to cart", "mrp", "product", "brand", "description"]
             combined_text = f"{title.lower()} {short_desc.lower()} {body_text.lower()}"
             keyword_matches = sum(1 for word in keywords if word in combined_text)
-            
+
             if keyword_matches < 2 or len(body_text) < 100:
                 return {"url": url, "error": "Page doesn't appear to be a product page."}
 
@@ -75,27 +76,54 @@ async def extract_product_info(session, url):
 async def generate_aggregated_description(product_name, descriptions):
     combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
     prompt = f"""
-    You are a professional product content writer.
+You are a professional product copywriter. Based on the following product descriptions from various websites, write a single human-like, emotionally engaging, and informative product description for "{product_name}".
 
-    Based on the following product descriptions from various sources, write a single long, human-like, engaging, and informative product description for "{product_name}".
+📌 Guidelines:
+- Start with a **short description** (overview).
+- Merge all **key features** into the main product description without a heading.
+- Add a **How to Use** section.
+- End the product description with any concluding insights — as a continuation of the main paragraph.
+- Do NOT use subheadings like 'Conclusion' or 'Key Features'.
+- Maintain a friendly, conversational tone like a real human would write.
+- Format using **markdown** (e.g., bold titles).
+- Keep it under 800 words.
 
-    ✅ Important Guidelines:
-    - Always format the description using clear **subheadings** such as: Overview, Key Features, Benefits, Usage, and Conclusion.
-    - Avoid any repetition.
-    - Maintain a friendly yet professional tone.
-    - Use markdown formatting with **bold subheadings**.
-    - Limit the total content to approximately 800 words.
-    - Return only the final formatted product description.
+{combined_texts}
 
-    {combined_texts}
-    """
+Return only the final formatted product description.
+"""
     try:
         response = co.chat(model="command-r-plus-08-2024", message=prompt)
         return response.text
     except Exception as e:
         return f"Error generating summary: {str(e)}"
 
-# 4. 💾 Save to Hugging Face Dataset
+# 4. 🤖 Optional Paraphrasing with Hugging Face
+
+def paraphrase_with_huggingface(text):
+    api_url = "https://api-inference.huggingface.co/models/tuner007/pegasus_paraphrase"
+    headers = {
+        "Authorization": f"Bearer {HF_API_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "inputs": text,
+        "parameters": {
+            "num_return_sequences": 1,
+            "num_beams": 5
+        }
+    }
+
+    try:
+        response = requests.post(api_url, headers=headers, json=payload)
+        if response.status_code == 200:
+            return response.json()[0]["generated_text"]
+        else:
+            return text  # fallback to original
+    except Exception as e:
+        return text
+
+# 5. 💾 Save to Hugging Face Dataset
 def save_to_huggingface_dataset(product_name, description):
     new_data = Dataset.from_dict({
         "product_name": [product_name],
@@ -109,7 +137,7 @@ def save_to_huggingface_dataset(product_name, description):
 
     combined.push_to_hub(HF_DATASET_NAME, split="train", private=False)
 
-# 5. 🚀 Streamlit Async Wrapper
+# 6. 🚀 Streamlit Async Wrapper
 st.title("🛍️ ProductSense: Smart Product Descriptions")
 product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
 
@@ -130,8 +158,9 @@ if product_name:
                         metadata.append(raw)
 
             final_summary = await generate_aggregated_description(product_name, descriptions)
-            save_to_huggingface_dataset(product_name, final_summary)
-            return final_summary, metadata
+            human_like_summary = paraphrase_with_huggingface(final_summary)
+            save_to_huggingface_dataset(product_name, human_like_summary)
+            return human_like_summary, metadata
 
     summary, sources = asyncio.run(run())
     st.subheader("📝 Final Product Description")
