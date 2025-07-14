@@ -131,7 +131,12 @@ if product_name:
 
     st.subheader("🔗 Sources Used")
     for result in sources:
-        if "error" in result:
-            st.warning(f"❌ {result['url']} — {result['error']}")
+        url = result.get("url", "")
+        title = result.get("title", "").strip()
+        error = result.get("error")
+
+        if error:
+            st.warning(f"❌ {url} — {error}")
         else:
-            st.markdown(f"**{result['title']}**\n[Visit Website]({result['url']})")
+            display_title = title if title else "🔗 View Page"
+            st.markdown(f"[**{display_title}**]({url})")
