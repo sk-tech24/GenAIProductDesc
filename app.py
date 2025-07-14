@@ -75,11 +75,19 @@ async def extract_product_info(session, url):
 async def generate_aggregated_description(product_name, descriptions):
     combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
     prompt = f"""
-You are a product content writer. Based on the following product descriptions from various sources, write a single human-like, engaging, and informative long product description for "{product_name}". Avoid repetition and make it look natural.
+    You are a professional product content writer.
 
-{combined_texts}
+    Based on the following product descriptions from various sources, write a single long, human-like, engaging, and informative product description for "{product_name}".
 
-Return only the final product description within only 800 words.
+    ✅ Important Guidelines:
+    - Always format the description using clear **subheadings** such as: Overview, Key Features, Benefits, Usage, and Conclusion.
+    - Avoid any repetition.
+    - Maintain a friendly yet professional tone.
+    - Use markdown formatting with **bold subheadings**.
+    - Limit the total content to approximately 800 words.
+    - Return only the final formatted product description.
+
+    {combined_texts}
     """
     try:
         response = co.chat(model="command-r-plus-08-2024", message=prompt)
