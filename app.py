@@ -76,44 +76,44 @@ async def extract_product_info(session, url):
 async def generate_aggregated_description(product_name, descriptions):
     combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
     prompt = f"""
-You are a professional SEO product copywriter. Write a single long product description for "{product_name}" using the info below. Make it sound human, engaging, and optimized for search engines.
+    Use the dependency grammar linguistic framework rather than phrase structure grammar to craft a product description. The idea is that the closer together each pair of words you're connecting is, the easier the copy will be to comprehend. Here is the topic and additional details: 
+    You are a professional SEO product copywriter. Based on the following descriptions for "{product_name}", generate one long, SEO-optimized, and human-sounding product description.
 
-**Guidelines:**
-- Start with a short overview.
-- Integrate key features directly into the body.
-- Include a clear 'How to Use' section.
-- Include natural conclusion merged into the main content.
-- Use markdown formatting.
-- Avoid headings like 'Conclusion' or 'Key Features'.
-- Include relevant keywords naturally (like brand, use-case, product category).
-- Use emotional, benefit-driven language.
+    Strictly follow this format:
 
-{combined_texts}
-"""
+    ### Short Description:
+    [A concise overview in 2-3 sentences]
+
+    ### Description:
+    [Combine all key features and conclusion into this section. Avoid adding any headers inside.]
+
+    ### How to Use:
+    [Step-by-step usage instructions in natural tone]
+
+    Guidelines:
+    - Do NOT use any extra headers like 'Key Features' or 'Conclusion'
+    - Use markdown formatting exactly as shown
+    - Make it emotional, benefit-focused, and clear
+    - Naturally embed relevant keywords (brand name, use-case, etc.)
+    - Avoid repetition
+
+    Descriptions from sources:
+    {combined_texts}
+    """
     try:
         response = co.chat(model="command-r-plus-08-2024", message=prompt)
         return response.text
     except Exception as e:
         return f"Error generating summary: {str(e)}"
 
-# 🤖 Humanize AI Output
+# # 🤖 Humanize AI Output
 
-def humanize_text(text):
-    try:
-        result = humanizer.run(text)
-        return result['humanizedText']
-    except Exception as e:
-        return text
-
-# 🔍 SEO Score
-
-def get_seo_score(text):
-    try:
-        report = analyze(text, url=None)
-        score = flesch_reading_ease(text)
-        return score
-    except:
-        return None
+# def humanize_text(text):
+#     try:
+#         result = humanizer.run(text)
+#         return result['humanizedText']
+#     except Exception as e:
+#         return text
 
 # 💾 Save to HF Dataset
 
@@ -158,13 +158,12 @@ if st.session_state.submitted and product_name:
                     else:
                         metadata.append(raw)
 
-            ai_summary = await generate_aggregated_description(product_name, descriptions)
-            human_like_summary = humanize_text(ai_summary)
-            seo_score = get_seo_score(human_like_summary)
-            save_to_huggingface_dataset(product_name, human_like_summary)
-            return human_like_summary, metadata, seo_score
+            summary = await generate_aggregated_description(product_name, descriptions)
+            # human_like_summary = humanize_text(ai_summary)
+            save_to_huggingface_dataset(product_name, summary)
+            return summary, metadata
 
-    summary, sources, seo_score = asyncio.run(run())
+    summary, sources = asyncio.run(run())
     st.subheader("📝 Final Product Description")
     st.write(summary)
 
