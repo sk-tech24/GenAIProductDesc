@@ -10,12 +10,15 @@ import re
 import aiohttp
 from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, disable_caching
 
+
+os.system("playwright install")
+
 # Load environment variables for API keys
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 co = cohere.Client(COHERE_API_KEY)
 
 # Disable datasets caching to avoid read-only FS issues on HF Spaces
-disable_caching()
+# disable_caching()
 HF_DATASET_NAME = "Jay-Rajput/product_desc"
 
 # 1. 🔍 Google Search via Playwright
@@ -99,7 +102,7 @@ def save_to_huggingface_dataset(product_name, description):
     combined.push_to_hub(HF_DATASET_NAME, split="train", private=False)
 
 # 5. 🚀 Streamlit Async Wrapper
-st.title("🛍️ Product Info Aggregator (Cohere + Hugging Face)")
+st.title("🛍️ ProductSense: Smart Product Descriptions")
 product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
 
 if product_name:
