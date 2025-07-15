@@ -96,31 +96,28 @@ async def generate_and_humanize_description(product_name, descriptions):
     # Combine all scraped descriptions into one block of text for the prompt
     combined_texts = "\n\n---\n\n".join([f"Source Document from a website:\n{desc}" for desc in descriptions if desc])
 
-    # The consolidated, powerful prompt
     prompt = f"""
-    You are an expert e-commerce copywriter and SEO specialist. Your task is to create a compelling, human-sounding, and SEO-optimized product description for "{product_name}" based on the provided source documents scraped from the web.
-
     **Instructions:**
 
     1.  **Analyze and Synthesize:** Read all the source documents to understand the product's key features, benefits, and how it's used. Synthesize this information into a single, coherent description.
-    2.  **Adopt a Human & Engaging Tone:** Write in a natural, persuasive, and slightly informal style. Use varied sentence structures, rich vocabulary, and address the customer directly (e.g., "You'll love how..."). The goal is to create text that is completely undetectable as AI-generated.
-    3.  **SEO Optimization:** Naturally weave in relevant keywords from the source text. Think about what a customer would search for to find this product.
-    4.  **Strict Formatting:** You MUST format the output in Markdown exactly as follows. Do not add any other headers, notes, or introductory text.
+    2.  **Strict Formatting:** You MUST format the output in Markdown exactly as follows. Do not add any other headers, notes, or introductory text.
 
     ---
     ### Short Description:
-    [A concise, captivating overview in 2-3 sentences. This should be a hook to grab the reader's attention and highlight the main benefit.]
+    [A concise, captivating overview in 2-3 sentences.]
 
     ### Description:
-    [This is the main body. Combine all key features, benefits, and a concluding thought into a single, flowing text block. Do NOT use sub-headers like 'Key Features' or 'Conclusion' within this section. Write at least 3-4 paragraphs.]
+    [This is the main body. Combine all key features, benefits, and a concluding thought into a single, flowing text block. Do NOT use sub-headers like 'Key Features' or 'Conclusion' within this section.]
 
     ### How to Use:
-    [Provide clear, step-by-step instructions for using the product. If this information is not available in the source documents, write "Specific usage instructions were not found, but it is typically used by..."]
+    [Provide clear, step-by-step instructions for using the product. If this information is not available in the source documents, don't add it."]
     ---
 
     **Source Documents to Analyze:**
 
     {combined_texts}
+    
+    Follow the Instructions provided above and Rewrite the following description to make it sound as if it were written by a human, not an AI. Use a varied sentence structure, a natural and slightly more personal tone, and incorporate rhetorical devices or asides where appropriate. The goal is to significantly increase the text's "perplexity" and "burstiness" to make it undetectable by AI content detectors, while strictly preserving the original meaning and information.
     """
 
     try:
