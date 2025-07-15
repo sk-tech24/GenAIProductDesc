@@ -145,7 +145,7 @@ if "submitted" not in st.session_state:
 
 with st.form("product_form"):
     product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
-    submitted = st.form_submit_button("Generate")
+    submitted = st.form_submit_button("Generate Description")
 
 if submitted and product_name:
     st.session_state.submitted = True
