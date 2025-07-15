@@ -106,7 +106,7 @@ async def generate_aggregated_description(product_name, descriptions):
 
 def build_humanizer_prompt(ai_description):
     return f"""
-Rewrite the following text to make it sound as if it were written by a human, not an AI. Use a varied sentence structure, a natural and slightly more personal tone, and incorporate rhetorical devices or asides where appropriate. The goal is to significantly increase the text's "perplexity" and "burstiness" to make it undetectable by AI content detectors, while strictly preserving the original meaning, format and information.
+Rewrite the following text to make it sound as if it were written by a human, not an AI. Use a varied sentence structure, a natural and slightly more personal tone, and incorporate rhetorical devices or asides where appropriate. The goal is to significantly increase the text's "perplexity" and "burstiness" to make it undetectable by AI content detectors, while strictly preserving the original meaning and information.
 
 {ai_description}
 """
