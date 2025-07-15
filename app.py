@@ -5,186 +5,232 @@ import asyncio
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 import os
-import cohere
 import re
 import aiohttp
-import requests
-from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, disable_caching
+from datasets import Dataset, concatenate_datasets, load_dataset
 import google.generativeai as genai
-import os
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# --- Configuration ---
+# Make sure to set your GEMINI_API_KEY as an environment variable
+# For Streamlit Community Cloud, you can set this in the app's secrets.
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception:
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-
-# 🚀 Setup
-os.system("playwright install")
-
-COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-co = cohere.Client(COHERE_API_KEY)
 HF_DATASET_NAME = "Jay-Rajput/product_desc"
 
-# 🔍 Google Search
-async def search_product_links(query, max_links=5):
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(f"https://www.google.com/search?q={query}")
-        await page.wait_for_timeout(2000)
-        elements = await page.query_selector_all("a")
-        links = []
-        for e in elements:
-            href = await e.get_attribute("href")
-            if href and href.startswith("/url?q="):
-                clean_link = href.split("/url?q=")[1].split("&")[0]
-                if ("google" not in clean_link and not clean_link.startswith("#") and
-                    not any(domain in clean_link for domain in ["youtube.com", "facebook.com", "instagram.com"])):
-                    links.append(clean_link)
-            if len(links) >= max_links:
-                break
-        await browser.close()
-        return links
+# --- Core Functions ---
 
-# 🕷️ Scraper
-async def extract_product_info(session, url):
+# 🚀 Setup Playwright (runs only once)
+@st.cache_resource
+def install_playwright():
+    os.system("playwright install chromium")
+    return True
+
+install_playwright()
+
+# 🔍 Google Search using Playwright
+async def search_product_links(query, max_links=5):
+    """Searches Google for a product and returns the top relevant links."""
+    links = []
     try:
-        async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10) as response:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.goto(f"https://www.google.com/search?q={query.replace(' ', '+')}&tbm=shop")
+            await page.wait_for_load_state('networkidle', timeout=5000)
+
+            # Select links specifically from Google Shopping results for higher relevance
+            locators = page.locator('a')
+            for i in range(await locators.count()):
+                href = await locators.nth(i).get_attribute('href')
+                if href and href.startswith('/url?q='):
+                    clean_link = href.split('/url?q=')[1].split('&')[0]
+                    # Filter out irrelevant domains
+                    if "google.com" not in clean_link and not any(domain in clean_link for domain in ["youtube.com", "facebook.com", "instagram.com", "pinterest.com"]):
+                        links.append(clean_link)
+                if len(links) >= max_links:
+                    break
+            await browser.close()
+    except Exception as e:
+        st.error(f"Error during Google search: {e}")
+    return links
+
+# 🕷️ Scrape Product Info from a URL
+async def extract_product_info(session, url):
+    """Extracts product title and description from a given URL."""
+    try:
+        async with session.get(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}, timeout=10) as response:
+            if response.status != 200:
+                return {"url": url, "error": f"Failed with status code {response.status}"}
+            
             text = await response.text()
             soup = BeautifulSoup(text, "html.parser")
+            
             title = soup.title.text.strip() if soup.title else ""
-            meta_desc = soup.find("meta", attrs={"name": "description"})
-            short_desc = meta_desc['content'] if meta_desc else ""
+            
+            # Find all paragraphs and join them to form a comprehensive description
             paragraphs = soup.find_all("p")
-            body_text = " ".join([p.text.strip() for p in paragraphs[:15] if len(p.text.strip()) > 30])
+            long_desc = " ".join([p.text.strip() for p in paragraphs if len(p.text.strip()) > 50])
+            long_desc = re.sub(r'\s+', ' ', long_desc) # Clean up extra whitespace
 
-            keywords = ["price", "buy", "add to cart", "mrp", "product", "brand", "description"]
-            combined_text = f"{title.lower()} {short_desc.lower()} {body_text.lower()}"
-            keyword_matches = sum(1 for word in keywords if word in combined_text)
-
-            if keyword_matches < 2 or len(body_text) < 100:
-                return {"url": url, "error": "Page doesn't appear to be a product page."}
+            # Basic check to see if it's a valid product page
+            if len(long_desc) < 150:
+                return {"url": url, "error": "Content too short, likely not a product page."}
 
             return {
                 "url": url,
                 "title": title,
-                "short_desc": short_desc,
-                "long_desc": body_text
+                "description": long_desc
             }
     except Exception as e:
         return {"url": url, "error": str(e)}
 
-# 🧠 Generate SEO-Friendly Description
-async def generate_aggregated_description(product_name, descriptions):
-    combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
+# 🧠✨ Generate and Humanize Description with Gemini
+async def generate_and_humanize_description(product_name, descriptions):
+    """
+    Calls the Gemini API with a consolidated prompt to format, aggregate,
+    and humanize the scraped product descriptions in a single step.
+    """
+    # Combine all scraped descriptions into one block of text for the prompt
+    combined_texts = "\n\n---\n\n".join([f"Source Document from a website:\n{desc}" for desc in descriptions if desc])
+
+    # The consolidated, powerful prompt
     prompt = f"""
-    Use the dependency grammar linguistic framework rather than phrase structure grammar to craft a product description. The idea is that the closer together each pair of words you're connecting is, the easier the copy will be to comprehend. Here is the topic and additional details: 
-    Based on the following descriptions for "{product_name}", generate one product description.
+    You are an expert e-commerce copywriter and SEO specialist. Your task is to create a compelling, human-sounding, and SEO-optimized product description for "{product_name}" based on the provided source documents scraped from the web.
 
-    Strictly follow this format:
+    **Instructions:**
 
+    1.  **Analyze and Synthesize:** Read all the source documents to understand the product's key features, benefits, and how it's used. Synthesize this information into a single, coherent description.
+    2.  **Adopt a Human & Engaging Tone:** Write in a natural, persuasive, and slightly informal style. Use varied sentence structures, rich vocabulary, and address the customer directly (e.g., "You'll love how..."). The goal is to create text that is completely undetectable as AI-generated.
+    3.  **SEO Optimization:** Naturally weave in relevant keywords from the source text. Think about what a customer would search for to find this product.
+    4.  **Strict Formatting:** You MUST format the output in Markdown exactly as follows. Do not add any other headers, notes, or introductory text.
+
+    ---
     ### Short Description:
-    [A concise overview in 2-3 sentences]
+    [A concise, captivating overview in 2-3 sentences. This should be a hook to grab the reader's attention and highlight the main benefit.]
 
     ### Description:
-    [Combine all key features and conclusion into this section. Avoid adding any headers inside.]
+    [This is the main body. Combine all key features, benefits, and a concluding thought into a single, flowing text block. Do NOT use sub-headers like 'Key Features' or 'Conclusion' within this section. Write at least 3-4 paragraphs.]
 
     ### How to Use:
-    [Step-by-step usage instructions]
+    [Provide clear, step-by-step instructions for using the product. If this information is not available in the source documents, write "Specific usage instructions were not found, but it is typically used by..."]
+    ---
 
-    Guidelines:
-    - Do NOT use any extra headers like 'Key Features' or 'Conclusion'
-    - Use markdown formatting exactly as shown
-    - Avoid repetition
+    **Source Documents to Analyze:**
 
-    Descriptions from sources:
     {combined_texts}
     """
-    try:
-        response = co.chat(model="command-r-plus-08-2024", message=prompt)
-        return response.text
-    except Exception as e:
-        return f"Error generating summary: {str(e)}"
 
-def build_humanizer_prompt(ai_description):
-    return f"""
-You are a professional copywriter. Rewrite the following product description to sound natural, engaging, SEO-friendly, and written by a human. Avoid repetition and keep formatting intact. Improve flow, vocabulary, and style:
-
-{ai_description}
-"""
-
-# 🤖 Humanize AI Output
-def humanize_text_with_gemini(text):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt_text = build_humanizer_prompt(text)
-        response = model.generate_content(prompt_text)
+        # Use the asynchronous version of the generate_content method
+        response = await model.generate_content_async(prompt)
         return response.text
     except Exception as e:
-        return f"[ERROR]: {str(e)}"
-    
-# 💾 Save to HF Dataset
+        st.error(f"Error calling Gemini API: {e}")
+        return f"[ERROR]: Could not generate description due to an API error. {str(e)}"
+
+# 💾 Save to Hugging Face Dataset
 def save_to_huggingface_dataset(product_name, description):
-    new_data = Dataset.from_dict({
-        "product_name": [product_name],
-        "description": [description]
-    })
+    """Saves the generated product description to a Hugging Face dataset."""
+    if "[ERROR]" in description:
+        st.warning("Skipping save to Hugging Face due to generation error.")
+        return
+
     try:
-        existing = load_dataset(HF_DATASET_NAME, split="train")
-        combined = concatenate_datasets([existing, new_data])
-    except:
-        combined = new_data
+        new_data = Dataset.from_dict({
+            "product_name": [product_name],
+            "description": [description]
+        })
+        
+        # Try to load the existing dataset and append new data
+        try:
+            existing_dataset = load_dataset(HF_DATASET_NAME, split="train")
+            combined_dataset = concatenate_datasets([existing_dataset, new_data])
+        except Exception:
+            # If dataset doesn't exist, the new data is the dataset
+            st.info("Creating new Hugging Face dataset.")
+            combined_dataset = new_data
 
-    combined.push_to_hub(HF_DATASET_NAME, split="train", private=False)
+        # Push the updated dataset to the hub
+        combined_dataset.push_to_hub(HF_DATASET_NAME, private=False)
+        st.success(f"Successfully saved to Hugging Face Dataset: {HF_DATASET_NAME}")
+    except Exception as e:
+        st.error(f"Could not save to Hugging Face Hub: {e}")
 
-# 🚀 Streamlit UI
-st.title("🛍️ ProductSense: Smart Product Descriptions")
+
+# --- Streamlit UI ---
+
+st.set_page_config(page_title="ProductSense", page_icon="🛍️", layout="wide")
+st.title("🛍️ ProductSense: AI-Powered Product Descriptions")
+st.markdown("Enter a product name to scrape the web and generate a human-like description.")
+
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
 with st.form("product_form"):
-    product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
-    submitted = st.form_submit_button("Generate")
+    product_name = st.text_input("Enter a specific product name (e.g., 'Sony WH-1000XM5 Wireless Headphones'):", key="product_input")
+    submitted = st.form_submit_button("✨ Generate Description")
 
-if submitted:
+if submitted and product_name:
     st.session_state.submitted = True
+    st.session_state.product_name = product_name
+else:
+    st.session_state.submitted = False
 
-if st.session_state.submitted and product_name:
-    async def run():
-        with st.spinner("Searching and scraping..."):
-            urls = await search_product_links(product_name, max_links=5)
+if st.session_state.submitted and st.session_state.get("product_name"):
+    
+    async def main_flow():
+        product_to_process = st.session_state.product_name
+        final_description = ""
+        scraped_metadata = []
+
+        with st.spinner(f"Step 1/3: Searching Google for '{product_to_process}'..."):
+            urls = await search_product_links(product_to_process, max_links=5)
+            if not urls:
+                st.error("Could not find any relevant links. Please try a more specific product name.")
+                return
+
+        with st.spinner(f"Step 2/3: Scraping {len(urls)} websites for product info..."):
             descriptions = []
-            metadata = []
             async with aiohttp.ClientSession() as session:
                 scrape_tasks = [extract_product_info(session, url) for url in urls]
-                scraped_data = await asyncio.gather(*scrape_tasks)
-                for raw in scraped_data:
-                    if 'error' not in raw:
-                        descriptions.append(raw['long_desc'])
-                        metadata.append(raw)
-                    else:
-                        metadata.append(raw)
+                scraped_results = await asyncio.gather(*scrape_tasks)
+                
+                for result in scraped_results:
+                    if 'error' not in result:
+                        descriptions.append(result['description'])
+                    scraped_metadata.append(result)
+        
+        if not descriptions:
+            st.error("Scraping failed for all sources. Could not gather enough information to write a description.")
+            # Optionally display errors from metadata here
+            return
 
-            ai_summary = await generate_aggregated_description(product_name, descriptions)
-            human_like_summary = humanize_text_with_gemini(ai_summary)
-            save_to_huggingface_dataset(product_name, human_like_summary)
-            return human_like_summary, metadata
+        with st.spinner("Step 3/3: AI is writing and humanizing the description..."):
+            final_description = await generate_and_humanize_description(product_to_process, descriptions)
+        
+        # Display final output
+        st.subheader("📝 Final Product Description")
+        st.markdown(final_description)
 
-    summary, sources = asyncio.run(run())
-    st.subheader("📝 Final Product Description")
-    st.write(summary)
+        # Save to Hugging Face
+        save_to_huggingface_dataset(product_to_process, final_description)
+        
+        # Display sources for transparency
+        with st.expander("View Scraped Sources"):
+            for result in scraped_metadata:
+                url = result.get("url", "")
+                title = result.get("title", "").strip()
+                error = result.get("error")
+                if error:
+                    st.warning(f"⚠️ **{url}** — Error: {error}")
+                else:
+                    st.success(f"✅ **{title}** — Successfully scraped from [{url}]({url})")
 
-    # if seo_score:
-    #     st.markdown(f"📈 **SEO Readability Score**: {round(seo_score, 2)}")
+    # Run the main asynchronous process
+    asyncio.run(main_flow())
+    st.session_state.submitted = False # Reset state after completion
 
-    # st.subheader("🔗 Sources Used")
-    # for result in sources:
-    #     url = result.get("url", "")
-    #     title = result.get("title", "").strip()
-    #     error = result.get("error")
-
-    #     if error:
-    #         st.warning(f"❌ {url} — {error}")
-    #     else:
-    #         display_title = title if title else "🔗 View Page"
-    #         st.markdown(f"[**{display_title}**]({url})")
-
-    st.session_state.submitted = False
