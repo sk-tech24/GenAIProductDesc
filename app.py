@@ -9,7 +9,7 @@ import cohere
 import re
 import aiohttp
 import requests
-from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, disable_caching
+from datasets import Dataset, load_dataset, concatenate_datasets
 import google.generativeai as genai
 import os
 
@@ -136,7 +136,10 @@ def save_to_huggingface_dataset(product_name, description):
     combined.push_to_hub(HF_DATASET_NAME, split="train", private=False)
 
 # 🚀 Streamlit UI
-st.title("🛍️ ProductSense: Smart Product Descriptions")
+st.set_page_config(page_title="ProductSense", page_icon="🛍️", layout="wide")
+st.title("🛍️ ProductSense: AI-Powered Product Descriptions")
+st.markdown("Enter a product name to scrape the web and generate a description.")
+
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
@@ -144,8 +147,12 @@ with st.form("product_form"):
     product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
     submitted = st.form_submit_button("Generate")
 
-if submitted:
+if submitted and product_name:
     st.session_state.submitted = True
+    st.session_state.product_name = product_name
+elif submitted and not product_name:
+    st.warning("Please enter a product name.")
+    st.session_state.submitted = False
 
 if st.session_state.submitted and product_name:
     async def run():
