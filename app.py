@@ -106,31 +106,25 @@ async def generate_aggregated_description(product_name, descriptions):
 
 def build_humanizer_prompt(ai_description):
     return f"""
-    Your primary mission is to rewrite the following text so it sounds completely human and is undetectable by AI content detectors. Your secondary goal is to organize it into the specific format below.
+    
+    You are an expert product description writer. Your task is to take the following AI-generated product description and rewrite it in a humanized, engaging, and persuasive style. Ensure the output maintains the following format:
 
-Act as a passionate brand storyteller, not a formal copywriter. Write as if you're excitedly explaining a product you love to a friend.
+    **Short Description:** [A concise, attention-grabbing summary of the product and its key benefit. Aim for approximately 1-2 sentences.]
 
-Required Format:
+    **Long Description:** [A more detailed description that elaborates on the product's features and, most importantly, its benefits to the customer. This section should tell a story or paint a picture of how the product improves the user's life. Include a bulleted list of key features.]
 
-Short Description
+        **Key Features:**
+        * [Feature 1 with a clear benefit statement]
+        * [Feature 2 with a clear benefit statement]
+        * [Feature 3 with a clear benefit statement]
+        * ... [Continue as needed]
 
-The Details That Matter
+    **How to Use:** [Clear, step-by-step instructions or guidance on how to effectively use the product.]
 
-How to Use
+    **Crucially, ensure the rewritten description reads like a genuine product description you would find on an e-commerce website, not like a blog post, article, or general informational text. Focus on direct and compelling language that encourages a purchase.**
 
-Rules for a Human Voice:
+    Here is the AI-generated product description you need to humanize:
 
-Vary Your Rhythm: This is crucial. Mix short, punchy sentences with longer, more descriptive ones. Avoid having several sentences of the same length in a row. It should feel like a real conversation.
-
-Use Conversational Language: Sprinkle in natural, conversational phrases. Ask the reader questions. Use phrases like "Here's the thing," "Bottom line?," or "Think of it this way."
-
-Embrace Imperfect Flow: Human writing isn't always perfect. It's okay to use a sentence fragment for emphasis. Like this one. It breaks the pattern and feels more authentic.
-
-Focus on Emotion and Sensory Details: Don't just list benefits. Describe the feeling of using the product. What problem does it solve? What frustration does it remove? Use words that evoke touch, sight, or feeling.
-
-Preserve All Information: You must accurately include all the original product details and specifications within your narrative.
-
-Here is the text to transform:
     {ai_description}
     """
 
