@@ -107,10 +107,32 @@ async def generate_aggregated_description(product_name, descriptions):
 def build_humanizer_prompt(ai_description):
     return f"""
     
-    Rewrite the following product description to sound like it was written by a real human copywriter for a product listing. Maintain formatting (Short Description, Description, etc.) and keep it clear, natural, and professional. Avoid generic AI patterns like 'Get ready for…', 'This isn’t your average…', and overly polished phrases like 'luscious locks' or 'light as air'. Instead, use varied sentence structure, natural transitions, and grounded, specific vocabulary. Make it sound helpful and realistic — not overly scripted or salesy.
-    Preserve headings and structure. Do not reformat into a blog or narrative.
-    
-    Here’s the original product description that needs to be humanized:
+    Rewrite the following product description so it looks and feels truly written by a human copywriter, while keeping the exact format:
+
+### Short Description:
+[ ... 2–3 lines summary ...]
+
+### Description:
+[ ... key features and details, single block ... ]
+
+### How to Use:
+[ ... step-by-step usage instructions ... ]
+
+Your rewrite must:
+1. Preserve all headings and their order.
+2. Use varied sentence lengths and rhythm: mix short punchy lines with longer ones.
+3. Avoid cliché marketing phrases (“Get ready for...”, “This isn’t your average…”, etc.).
+4. Inject subtle, natural imperfections: mild colloquialisms (“a bit”, “kind of”), contractions (“you’ll”, “it’s”), and even occasional minor typos or slight grammatical quirks.
+5. Include a rhetorical question or two (e.g., “Want fuller hair?”, “Need something easy?”) — humans often use them casually.
+6. Use grounded, specific detail — not vague superlatives.
+7. Avoid repeating keywords or terms in close proximity.
+8. Add tiny personal touches or relatable imagery — but don’t turn it into a story or blog post.
+9. Don’t over‑optimize for SEO; write for humans, not machines.
+10. Maintain clarity and professionalism — readable, easy to skim.
+
+Here’s the original description:
+
+[PASTE AI‑GENERATED PRODUCT DESCRIPTION HERE]
 
     {ai_description}
     """
