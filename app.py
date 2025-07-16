@@ -106,7 +106,8 @@ async def generate_aggregated_description(product_name, descriptions):
 
 def build_humanizer_prompt(ai_description):
     return f"""
-Rewrite the following text to make it sound as if it were written by a human, not an AI. Use a varied sentence structure, a natural and slightly more personal tone, and incorporate rhetorical devices or asides where appropriate. The goal is to significantly increase the text's "perplexity" and "burstiness" to make it undetectable by AI content detectors, while strictly preserving the original meaning and information.
+    
+    Rewrite the following text to make it sound as if it were written by a human for a product page, not an AI for a blog post. Use a varied sentence structure and a natural, engaging tone that speaks directly to the customer. Your focus should be on the product's benefits and user experience. The goal is to make the text persuasive and trustworthy, avoiding the generic feel of AI content, while strictly preserving the original meaning and all key product information. Structure the output with short paragraphs and use bullet points for key features.
 
 {ai_description}
 """
