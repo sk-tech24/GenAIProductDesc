@@ -107,25 +107,9 @@ async def generate_aggregated_description(product_name, descriptions):
 def build_humanizer_prompt(ai_description):
     return f"""
     
-    You are a highly skilled product description writer with a knack for making products sound incredibly appealing and relatable to real people. Your goal is to take the following AI-generated product description and rewrite it with a genuine human voice, as if you are personally excited about this product and want to share its benefits with a friend.
+    Take the following AI-generated product description and rewrite it to sound more human-written while still keeping it in the style of a professional product description. Do not make it sound like a blog post or personal story. Use natural, conversational language with slight imperfections that mimic human writing — including varied sentence structure, informal phrasing where appropriate, and less robotic tone. Avoid overly polished or formulaic marketing language. The goal is to make it feel like it was written by a human copywriter for a product listing or catalog page. Maintain the core product details and keep the description clear, concise, and engaging.
 
-    Ensure the output maintains the following format:
-
-    **Short Description:** [Write a very brief, engaging summary that sparks curiosity and highlights the main reason someone would want this product. Imagine you're telling a friend about it in one or two quick sentences.]
-
-    **Long Description:** [Craft a detailed description that goes beyond just listing features. Focus on painting a picture of how this product will fit into the customer's life and solve their problems or fulfill their desires. Use emotional language and relatable scenarios. Include a bulleted list of key features written as direct benefits to the user.]
-
-        **Key Features (written as benefits):**
-        * Imagine [Benefit 1, starting with an action verb and focusing on the 'you'] - this means you can finally [Positive outcome].
-        * Get ready to [Benefit 2, again focusing on the 'you'] thanks to [Specific feature].
-        * You'll love how [Benefit 3, highlighting a feeling or positive experience] because [Reason].
-        * ... [Continue as needed, always focusing on the 'you' and the positive outcome]
-
-    **How to Use:** [Explain how to use the product in a simple, conversational way. Avoid overly technical terms and focus on the user's experience.]
-
-    **Remember, the language should feel natural, enthusiastic, and like it's coming from a real person who loves the product. Incorporate variations in sentence structure and use everyday language, including occasional contractions or interjections if appropriate for the product and target audience. The description should sound like a genuine recommendation, not a robotic listing of facts.**
-
-    Here is the AI-generated product description you need to humanize:
+    Here’s the original product description:
 
     {ai_description}
     """
