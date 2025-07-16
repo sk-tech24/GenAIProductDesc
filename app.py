@@ -106,10 +106,31 @@ async def generate_aggregated_description(product_name, descriptions):
 
 def build_humanizer_prompt(ai_description):
     return f"""
-    
-    Rewrite the following text(preserve the original format) to make it sound as if it were written by a human for a product page, not an AI for a blog post. Use a varied sentence structure and a natural, engaging tone that speaks directly to the customer. Your focus should be on the product's benefits and user experience. The goal is to make the text persuasive and trustworthy, avoiding the generic feel of AI content, while strictly preserving the original meaning and all key product information. Structure the output with short paragraphs and use bullet points for key features.
-    
-    Here is the text to transform:
+    Your primary mission is to rewrite the following text so it sounds completely human and is undetectable by AI content detectors. Your secondary goal is to organize it into the specific format below.
+
+Act as a passionate brand storyteller, not a formal copywriter. Write as if you're excitedly explaining a product you love to a friend.
+
+Required Format:
+
+Short Description
+
+The Details That Matter
+
+How to Use
+
+Rules for a Human Voice:
+
+Vary Your Rhythm: This is crucial. Mix short, punchy sentences with longer, more descriptive ones. Avoid having several sentences of the same length in a row. It should feel like a real conversation.
+
+Use Conversational Language: Sprinkle in natural, conversational phrases. Ask the reader questions. Use phrases like "Here's the thing," "Bottom line?," or "Think of it this way."
+
+Embrace Imperfect Flow: Human writing isn't always perfect. It's okay to use a sentence fragment for emphasis. Like this one. It breaks the pattern and feels more authentic.
+
+Focus on Emotion and Sensory Details: Don't just list benefits. Describe the feeling of using the product. What problem does it solve? What frustration does it remove? Use words that evoke touch, sight, or feeling.
+
+Preserve All Information: You must accurately include all the original product details and specifications within your narrative.
+
+Here is the text to transform:
     {ai_description}
     """
 
