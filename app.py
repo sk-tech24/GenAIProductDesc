@@ -107,11 +107,7 @@ async def generate_aggregated_description(product_name, descriptions):
 def build_humanizer_prompt(ai_description):
     return f"""
     
-    Rewrite the following AI-generated product description to sound more like it was written by a real human — but keep it structured like a product description, not a blog or review. Avoid polished marketing clichés (like 'unlock your full potential'), generic phrases, and robotic tone. Instead, use natural human phrasing, small imperfections, and more grounded, specific language. Vary sentence length and structure slightly, and avoid sounding too salesy or too perfect. Use everyday words — as if a real copywriter wrote this for an e-commerce listing.
-
-    Do not turn it into a blog or story. Keep it concise, product-focused, and natural.
-
-    Here’s the original product description:
+    Rewrite the following product description so it sounds more naturally human-written while still keeping it in a clear, product description format. Avoid robotic or formulaic language, overly polished marketing phrases (like 'salon-worthy results'), and perfectly structured sentences. Use slightly casual, human-sounding instructions — with mild imperfections and more real-world phrasing. Imagine a product copywriter explaining how to use it clearly and casually for a real customer. Keep the text concise and natural. Don't overuse bullet points — flow matters too.
 
     {ai_description}
     """
