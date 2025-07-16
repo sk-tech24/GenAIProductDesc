@@ -107,10 +107,24 @@ async def generate_aggregated_description(product_name, descriptions):
 def build_humanizer_prompt(ai_description):
     return f"""
     
-    Rewrite the following text to make it sound as if it were written by a human for a product page, not an AI for a blog post. Use a varied sentence structure and a natural, engaging tone that speaks directly to the customer. Your focus should be on the product's benefits and user experience. The goal is to make the text persuasive and trustworthy, avoiding the generic feel of AI content, while strictly preserving the original meaning and all key product information. Structure the output with short paragraphs and use bullet points for key features.
+    Act as an expert e-commerce copywriter. Your mission is to transform the following dry, AI-generated product details into a compelling and humanized product description.
 
-{ai_description}
-"""
+    Your final output must be structured in the following three parts, using these exact headings:
+    1. Short Description
+    2. Key Features & Benefits
+    3. How to Use
+
+    Adhere to these rules throughout:
+    -> Voice & Tone: Adopt an enthusiastic and helpful brand voice. Speak directly to the customer using "you" and "your" to help them envision using the product.
+    -> Focus on Benefits: In the 'Key Features & Benefits' section, don't just list features. Translate every feature into a tangible benefit. Use paragraphs or bullet points for clarity. End this section with a strong concluding sentence.
+    -> Humanize the Language: Vary your sentence length. Eliminate robotic jargon. In the 'How to Use' section, write the steps in a simple, encouraging, and easy-to-follow manner.
+    -> Preserve Accuracy: You must retain all original product information and specifications without altering their meaning. If a "How to Use" section is not provided in the original text, create a logical one based on the product type.
+
+    Do NOT write this as a single block of text, a blog post, or an article.
+
+    Here is the text to transform:
+    {ai_description}
+    """
 
 # 🤖 Humanize AI Output
 def humanize_text_with_gemini(text):
