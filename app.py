@@ -168,4 +168,3 @@ if submitted and product_name:
         ca_range = f"CA${price_info['ca_min']} – CA${price_info['ca_max']}" if price_info['ca_min'] is not None else "Not found"
         st.markdown(f"**Price Range:**\n- **USA**: {us_range}\n- **Canada**: {ca_range}")
 
-    st.success("✅ Description generation complete.")
