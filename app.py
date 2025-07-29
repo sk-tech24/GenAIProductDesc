@@ -171,7 +171,7 @@ if submitted and product_name:
 
     summary, sources, upc_code, price_info = asyncio.run(run())
 
-    st.subheader("📝 SEO-Ready Product Description")
+    st.subheader("📝 Product Description")
     st.markdown(summary)
 
     st.subheader("📦 Additional Details")
