@@ -125,9 +125,22 @@ st.set_page_config(page_title="ProductSense", page_icon="🛍️", layout="wide"
 st.title("🛍️ ProductSense: SEO-Enhanced Product Descriptions")
 
 with st.form("product_form"):
-    product_name = st.text_input("Product Name")
-    primary_keyword = st.text_input("Primary Keyword")
-    secondary_keywords = st.text_input("Secondary Keywords (comma-separated)")
+    st.write("### 🛒 Product Details")
+    col1, col2 = st.columns(2)
+    with col1:
+        product_name = st.text_input(
+            "Product Name",
+            placeholder="e.g. Sebastian Volupt Shampoo 250 ml"
+        )
+    with col2:
+        primary_keyword = st.text_input(
+            "Primary Keyword (optional)",
+            placeholder="e.g. volumizing shampoo"
+        )
+    secondary_keywords = st.text_input(
+        "Secondary Keywords (comma‑separated, optional)",
+        placeholder="e.g. body, fine hair, bounce"
+    )
     submitted = st.form_submit_button("Generate Description")
 
 if submitted and product_name:
