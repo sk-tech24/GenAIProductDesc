@@ -149,7 +149,7 @@ if submitted and product_name:
             upc = find_upc_from_amazon(product_name)
             price_data = get_price_range(product_name)
 
-            save_to_huggingface_dataset(product_name, humanized_summary)
+            # save_to_huggingface_dataset(product_name, humanized_summary)
 
             return humanized_summary, metadata, upc, price_data
 
