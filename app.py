@@ -13,6 +13,9 @@ from datasets import Dataset, load_dataset, concatenate_datasets
 import google.generativeai as genai
 from utils.meta_utils import extract_meta_title_description, find_upc_by_product_name, get_price_range
 
+# 🚀 Setup
+os.system("playwright install")
+
 # 🔐 API Configuration
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
