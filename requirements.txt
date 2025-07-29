@@ -4,6 +4,7 @@ beautifulsoup4
 playwright
 aiohttp
 datasets
+requests
 huggingface_hub
 humanize-ai-text
 google-generativeai

@@ -11,14 +11,10 @@ import aiohttp
 import requests
 from datasets import Dataset, load_dataset, concatenate_datasets
 import google.generativeai as genai
-import os
+from utils.meta_utils import extract_meta_title_description, find_upc_from_amazon, get_price_range
 
+# 🔐 API Configuration
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-
-# 🚀 Setup
-os.system("playwright install")
-
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 co = cohere.Client(COHERE_API_KEY)
 HF_DATASET_NAME = "Jay-Rajput/product_desc"
@@ -72,81 +68,41 @@ async def extract_product_info(session, url):
     except Exception as e:
         return {"url": url, "error": str(e)}
 
-# 🧠 Generate SEO-Friendly Description
-async def generate_aggregated_description(product_name, descriptions):
+# 🧠 Generate Structured Description
+async def generate_aggregated_description(product_name, primary_keyword, secondary_keywords, descriptions):
     combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
     prompt = f"""
-    Use the dependency grammar linguistic framework rather than phrase structure grammar to craft a product description. The idea is that the closer together each pair of words you're connecting is, the easier the copy will be to comprehend. Here is the topic and additional details: 
-    Based on the following descriptions for "{product_name}", generate one product description.
+Create an SEO-optimized product description for: {product_name}
 
-    Strictly follow this format:
+Use this format:
 
-    ### Short Description:
-    [A concise overview in 2-3 sentences]
+**Meta Title**: [max 60 chars, start with primary keyword]
+**Meta Description**: [120–160 chars, include 1–2 primary keywords]
 
-    ### Description:
-    [Combine all key features and conclusion into this section. Avoid adding any headers inside.]
+### Short Description:
+[Concise overview using primary + secondary keywords. 2-4 sentences. 50–160 words.]
 
-    ### How to Use:
-    [Step-by-step usage instructions]
+### Description:
+[Full body including problem, solution, benefits, features. Use primary/secondary keywords naturally. 300–350 words. No headers inside.]
 
-    Guidelines:
-    - Do NOT use any extra headers like 'Key Features' or 'Conclusion'
-    - Use markdown formatting exactly as shown
-    - Avoid repetition
+### How to Use:
+[Simple usage instructions.]
 
-    Descriptions from sources:
-    {combined_texts}
-    """
+### Ingredients:
+[List of main ingredients, if available. Add note about full list on packaging.]
+
+Descriptions from sources:
+{combined_texts}
+"""
     try:
         response = co.chat(model="command-r-plus-08-2024", message=prompt)
         return response.text
     except Exception as e:
         return f"Error generating summary: {str(e)}"
 
-def build_humanizer_prompt(ai_description):
-    return f"""
-    
-    Rewrite the following product description so it looks and feels truly written by a human copywriter, while keeping the exact format:
+# 🤖 Humanizer
+from utils.gemini_wrapper import humanize_text_with_gemini
 
-### Short Description:
-[ ... 2–3 lines summary ...]
-
-### Description:
-[ ... key features and details, single block ... ]
-
-### How to Use:
-[ ... step-by-step usage instructions ... ]
-
-Your rewrite must:
-1. Preserve all headings and their order.
-2. Use varied sentence lengths and rhythm: mix short punchy lines with longer ones.
-3. Avoid cliché marketing phrases (“Get ready for...”, “This isn’t your average…”, etc.).
-4. Inject subtle, natural imperfections: mild colloquialisms (“a bit”, “kind of”), contractions (“you’ll”, “it’s”), and even occasional minor typos or slight grammatical quirks.
-5. Include a rhetorical question or two (e.g., “Want fuller hair?”, “Need something easy?”) — humans often use them casually.
-6. Use grounded, specific detail — not vague superlatives.
-7. Avoid repeating keywords or terms in close proximity.
-8. Add tiny personal touches or relatable imagery — but don’t turn it into a story or blog post.
-9. Don’t over‑optimize for SEO; write for humans, not machines.
-10. Maintain clarity and professionalism — readable, easy to skim.
-
-Here’s the original description:
-
-[PASTE AI‑GENERATED PRODUCT DESCRIPTION HERE]
-
-    {ai_description}
-    """
-
-# 🤖 Humanize AI Output
-def humanize_text_with_gemini(text):
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt_text = build_humanizer_prompt(text)
-        response = model.generate_content(prompt_text)
-        return response.text
-    except Exception as e:
-        return f"[ERROR]: {str(e)}"
-    
 # 💾 Save to HF Dataset
 def save_to_huggingface_dataset(product_name, description):
     new_data = Dataset.from_dict({
@@ -163,26 +119,17 @@ def save_to_huggingface_dataset(product_name, description):
 
 # 🚀 Streamlit UI
 st.set_page_config(page_title="ProductSense", page_icon="🛍️", layout="wide")
-st.title("🛍️ ProductSense: AI-Powered Product Descriptions")
-st.markdown("Enter a product name to scrape the web and generate a description.")
-
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
+st.title("🛍️ ProductSense: SEO-Enhanced Product Descriptions")
 
 with st.form("product_form"):
-    product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
+    product_name = st.text_input("Product Name")
+    primary_keyword = st.text_input("Primary Keyword")
+    secondary_keywords = st.text_input("Secondary Keywords (comma-separated)")
     submitted = st.form_submit_button("Generate Description")
 
 if submitted and product_name:
-    st.session_state.submitted = True
-    st.session_state.product_name = product_name
-elif submitted and not product_name:
-    st.warning("Please enter a product name.")
-    st.session_state.submitted = False
-
-if st.session_state.submitted and product_name:
     async def run():
-        with st.spinner("Searching and scraping..."):
+        with st.spinner("Fetching sources and generating..."):
             urls = await search_product_links(product_name, max_links=5)
             descriptions = []
             metadata = []
@@ -196,28 +143,24 @@ if st.session_state.submitted and product_name:
                     else:
                         metadata.append(raw)
 
-            ai_summary = await generate_aggregated_description(product_name, descriptions)
-            human_like_summary = humanize_text_with_gemini(ai_summary)
-            save_to_huggingface_dataset(product_name, human_like_summary)
-            return human_like_summary, metadata
+            ai_summary = await generate_aggregated_description(product_name, primary_keyword, secondary_keywords, descriptions)
+            humanized_summary = humanize_text_with_gemini(ai_summary)
 
-    summary, sources = asyncio.run(run())
-    st.subheader("📝 Final Product Description")
-    st.write(summary)
+            upc = find_upc_from_amazon(product_name)
+            price_data = get_price_range(product_name)
 
-    # if seo_score:
-    #     st.markdown(f"📈 **SEO Readability Score**: {round(seo_score, 2)}")
+            save_to_huggingface_dataset(product_name, humanized_summary)
 
-    # st.subheader("🔗 Sources Used")
-    # for result in sources:
-    #     url = result.get("url", "")
-    #     title = result.get("title", "").strip()
-    #     error = result.get("error")
+            return humanized_summary, metadata, upc, price_data
 
-    #     if error:
-    #         st.warning(f"❌ {url} — {error}")
-    #     else:
-    #         display_title = title if title else "🔗 View Page"
-    #         st.markdown(f"[**{display_title}**]({url})")
+    summary, sources, upc_code, price_info = asyncio.run(run())
 
-    st.session_state.submitted = False
+    st.subheader("📝 SEO-Ready Product Description")
+    st.markdown(summary)
+
+    st.subheader("📦 Additional Details")
+    st.markdown(f"**UPC Code:** {upc_code if upc_code else 'Not Found'}")
+    if price_info:
+        st.markdown(f"**Price Range:**\n- **USA**: ${price_info['us_min']} – ${price_info['us_max']}\n- **Canada**: CA${price_info['ca_min']} – CA${price_info['ca_max']}")
+
+    st.success("✅ Description generation complete.")
