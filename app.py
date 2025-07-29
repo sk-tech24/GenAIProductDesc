@@ -124,75 +124,24 @@ def save_to_huggingface_dataset(product_name, description):
 st.set_page_config(page_title="ProductSense", page_icon="🛍️", layout="wide")
 st.title("🛍️ ProductSense: SEO-Enhanced Product Descriptions")
 
-# Step 1: Load custom CSS for input styling
-st.markdown("""
-<style>
-/* Input container highlight */
-div[data-baseweb="text-input"] {
-  margin-bottom: 20px;
-}
-
-/* Text input styling */
-.stTextInput input {
-  border: 1px solid #0a66c2;
-  border-radius: 6px;
-  padding: 10px 14px;
-  background-color: #fafbfc;
-  font-size: 16px;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-/* Hover effect */
-.stTextInput:hover input {
-  box-shadow: 0 4px 8px rgba(10, 102, 194, 0.15);
-  border-color: #084ea8;
-}
-
-/* Focus effect */
-.stTextInput:focus input {
-  border-color: #084ea8;
-  box-shadow: 0 2px 6px rgba(10, 102, 194, 0.3);
-}
-
-/* Smaller placeholders */
-.stTextInput input::placeholder {
-  color: #707070;
-}
-
-/* Form section header styling */
-.big-label {
-  font-size: 22px;
-  color: #0a66c2;
-  margin-bottom: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
 with st.form("product_form"):
-    st.markdown('<div class="big-label">🛒 Product Details</div>', unsafe_allow_html=True)
-
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([3, 2])
     with col1:
         product_name = st.text_input(
             "Product Name",
-            placeholder="e.g. Sebastian Volupt Shampoo 250 ml",
-            help="Type or paste the exact product name for best results",
+            placeholder="E.g. Sebastian Volupt Shampoo 250 ml",
+            label_visibility="visible"
         )
     with col2:
         primary_keyword = st.text_input(
             "Primary Keyword (optional)",
-            placeholder="Main SEO keyword",
-            help="Optional – helps SEO boost"
+            placeholder="e.g. volumizing shampoo"
         )
-
     secondary_keywords = st.text_input(
         "Secondary Keywords (optional, comma-separated)",
-        placeholder="e.g. volumizing, fine hair, bounce",
-        help="Optional – add related keywords"
+        placeholder="e.g. body, bounce, fine hair"
     )
-
-    submitted = st.form_submit_button("Generate Description")
+    submitted = st.form_submit_button(label="Generate Description")
 
 if submitted and product_name:
     async def run():
