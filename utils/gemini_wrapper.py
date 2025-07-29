@@ -7,7 +7,7 @@ import google.generativeai as genai
 GENAI_API_KEY = os.getenv("GENAI_API_KEY") or "YOUR_GEMINI_API_KEY"
 genai.configure(api_key=GENAI_API_KEY)
 
-model = genai.GenerativeModel("gemini-1.5-pro")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 
 def humanize_text_with_gemini(text: str) -> str:

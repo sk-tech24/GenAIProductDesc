@@ -11,7 +11,7 @@ import aiohttp
 import requests
 from datasets import Dataset, load_dataset, concatenate_datasets
 import google.generativeai as genai
-from utils.meta_utils import extract_meta_title_description, find_upc_from_amazon, get_price_range
+from utils.meta_utils import extract_meta_title_description, find_upc_by_product_name, get_price_range
 
 # 🔐 API Configuration
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -146,7 +146,7 @@ if submitted and product_name:
             ai_summary = await generate_aggregated_description(product_name, primary_keyword, secondary_keywords, descriptions)
             humanized_summary = humanize_text_with_gemini(ai_summary)
 
-            upc = find_upc_from_amazon(product_name)
+            upc = find_upc_by_product_name(product_name)
             price_data = get_price_range(product_name)
 
             # save_to_huggingface_dataset(product_name, humanized_summary)
@@ -161,6 +161,8 @@ if submitted and product_name:
     st.subheader("📦 Additional Details")
     st.markdown(f"**UPC Code:** {upc_code if upc_code else 'Not Found'}")
     if price_info:
-        st.markdown(f"**Price Range:**\n- **USA**: ${price_info['us_min']} – ${price_info['us_max']}\n- **Canada**: CA${price_info['ca_min']} – CA${price_info['ca_max']}")
+        us_range = f"${price_info['us_min']} – ${price_info['us_max']}" if price_info['us_min'] is not None else "Not found"
+        ca_range = f"CA${price_info['ca_min']} – CA${price_info['ca_max']}" if price_info['ca_min'] is not None else "Not found"
+        st.markdown(f"**Price Range:**\n- **USA**: {us_range}\n- **Canada**: {ca_range}")
 
     st.success("✅ Description generation complete.")
