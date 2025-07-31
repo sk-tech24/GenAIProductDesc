@@ -1,45 +1,30 @@
-# --------------------------------------------------------------------------
-# ProductSense AI Agent - Enhanced Version
-#
-# This Streamlit application acts as a sophisticated AI agent for e-commerce.
-# It takes a product name and keywords, scours the web for information,
-# and generates a comprehensive, SEO-optimized, and human-like product
-# listing.
-#
-# Author: Jay
-# Version: 2.0
-# --------------------------------------------------------------------------
+# 📦 Streamlit Product Info Scraper App (SEO-Optimized + Humanized)
 
 import streamlit as st
 import asyncio
-import os
-import google.generativeai as genai
-import json
-from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
-import aiohttp
-from datasets import Dataset, load_dataset, concatenate_datasets
-
-
-# --- Configuration & Initialization ---
+from playwright.async_api import async_playwright
 import os
-os.system('playwright install')
+import cohere
+import re
+import aiohttp
+import requests
+from datasets import Dataset, load_dataset, concatenate_datasets
+import google.generativeai as genai
+import os
 
-# Configure the Gemini API key
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except Exception:
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 
-# Hugging Face dataset configuration
+# 🚀 Setup
+os.system("playwright install")
+
+COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+co = cohere.Client(COHERE_API_KEY)
 HF_DATASET_NAME = "Jay-Rajput/product_desc"
-HF_TOKEN = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
 
-
-# --- Web Scraping and Data Extraction Modules ---
 # 🔍 Google Search
-async def get_search_links(query, num_links=5):
+async def search_product_links(query, max_links=5):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -54,349 +39,170 @@ async def get_search_links(query, num_links=5):
                 if ("google" not in clean_link and not clean_link.startswith("#") and
                     not any(domain in clean_link for domain in ["youtube.com", "facebook.com", "instagram.com"])):
                     links.append(clean_link)
-            if len(links) >= num_links:
+            if len(links) >= max_links:
                 break
         await browser.close()
         return links
 
-# async def get_search_links(query: str, num_links: int = 5) -> list:
-#     """
-#     Uses Playwright to perform a Google search and return top organic results.
-#     Filters out common non-product domains.
-#     """
-#     links = []
-#     try:
-#         async with async_playwright() as p:
-#             browser = await p.chromium.launch(headless=True)
-#             page = await browser.new_page()
-#             await page.goto(f"https://www.google.com/search?q={query.replace(' ', '+')}")
-#             await page.wait_for_selector('div#search', state='attached', timeout=10000)
-
-#             elements = await page.query_selector_all("a")
-#             for element in elements:
-#                 href = await element.get_attribute("href")
-#                 if href and href.startswith("/url?q="):
-#                     clean_link = href.split("/url?q=")[1].split("&")[0]
-#                     # Filter out irrelevant domains
-#                     if not any(domain in clean_link for domain in ["google.com", "youtube.com", "facebook.com", "instagram.com", "pinterest.com"]):
-#                         links.append(clean_link)
-#                 if len(links) >= num_links:
-#                     break
-#             await browser.close()
-#     except Exception as e:
-#         st.error(f"An error occurred during web search: {e}")
-#     return links
-
-async def scrape_page_content(session: aiohttp.ClientSession, url: str) -> dict:
-    """
-    Asynchronously scrapes the text content of a given URL.
-    Returns a dictionary with the URL and its cleaned text content or an error.
-    """
+# 🕷️ Scraper
+async def extract_product_info(session, url):
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
-        async with session.get(url, headers=headers, timeout=15) as response:
-            if response.status == 200:
-                html = await response.text()
-                soup = BeautifulSoup(html, "html.parser")
-                # Remove script and style elements
-                for script_or_style in soup(["script", "style"]):
-                    script_or_style.decompose()
-                # Get text and clean it up
-                text = soup.get_text()
-                lines = (line.strip() for line in text.splitlines())
-                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-                cleaned_text = '\n'.join(chunk for chunk in chunks if chunk)
-                return {"url": url, "content": cleaned_text[:5000]} # Limit content length
-            else:
-                return {"url": url, "error": f"HTTP Status {response.status}"}
+        async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10) as response:
+            text = await response.text()
+            soup = BeautifulSoup(text, "html.parser")
+            title = soup.title.text.strip() if soup.title else ""
+            meta_desc = soup.find("meta", attrs={"name": "description"})
+            short_desc = meta_desc['content'] if meta_desc else ""
+            paragraphs = soup.find_all("p")
+            body_text = " ".join([p.text.strip() for p in paragraphs[:15] if len(p.text.strip()) > 30])
+
+            keywords = ["price", "buy", "add to cart", "mrp", "product", "brand", "description"]
+            combined_text = f"{title.lower()} {short_desc.lower()} {body_text.lower()}"
+            keyword_matches = sum(1 for word in keywords if word in combined_text)
+
+            if keyword_matches < 2 or len(body_text) < 100:
+                return {"url": url, "error": "Page doesn't appear to be a product page."}
+
+            return {
+                "url": url,
+                "title": title,
+                "short_desc": short_desc,
+                "long_desc": body_text
+            }
     except Exception as e:
         return {"url": url, "error": str(e)}
 
-async def get_shopping_data(product_name: str, country_code: str) -> str:
-    """
-    Scrapes Google Shopping results for a product in a specific country.
-    """
-    country_domains = {"ca": "google.ca", "us": "google.com"}
-    gl_codes = {"ca": "ca", "us": "us"}
-    domain = country_domains.get(country_code.lower(), "google.com")
-    gl = gl_codes.get(country_code.lower(), "us")
-    
-    query = f"{product_name} upc"
-    search_url = f"https://www.{domain}/search?q={query.replace(' ', '+')}&tbm=shop&gl={gl}"
+# 🧠 Generate SEO-Friendly Description
+async def generate_aggregated_description(product_name, descriptions):
+    combined_texts = "\n\n".join([f"Source {i+1}: {desc}" for i, desc in enumerate(descriptions)])
+    prompt = f"""
+    Use the dependency grammar linguistic framework rather than phrase structure grammar to craft a product description. The idea is that the closer together each pair of words you're connecting is, the easier the copy will be to comprehend. Here is the topic and additional details: 
+    Based on the following descriptions for "{product_name}", generate one product description.
 
-    content = ""
+    Strictly follow this format:
+
+    ### Short Description:
+    [A concise overview in 2-3 sentences]
+
+    ### Description:
+    [Combine all key features and conclusion into this section. Avoid adding any headers inside.]
+
+    ### How to Use:
+    [Step-by-step usage instructions]
+
+    Guidelines:
+    - Do NOT use any extra headers like 'Key Features' or 'Conclusion'
+    - Use markdown formatting exactly as shown
+    - Avoid repetition
+
+    Descriptions from sources:
+    {combined_texts}
+    """
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            await page.goto(search_url)
-            await page.wait_for_selector('body', state='attached', timeout=10000)
-            content = await page.inner_text('body')
-            await browser.close()
+        response = co.chat(model="command-r-plus-08-2024", message=prompt)
+        return response.text
     except Exception as e:
-        st.warning(f"Could not fetch shopping data for {country_code.upper()}: {e}")
-    
-    return content
+        return f"Error generating summary: {str(e)}"
 
-
-# --- AI Content Generation Module ---
-def build_master_prompt(product_name: str, primary_keywords: str, secondary_keywords: str, web_context: str, shopping_context_us: str, shopping_context_ca: str) -> str:
-    """
-    Constructs the detailed, structured prompt for the Gemini model.
-    """
+def build_humanizer_prompt(ai_description):
     return f"""
-    As an expert eCommerce content strategist and copywriter, your task is to generate a complete and optimized product listing.
+    
+    Rewrite the following product description so it looks and feels truly written by a human copywriter, while keeping the exact format:
 
-    **Product Information:**
-    - Product Name: "{product_name}"
-    - Primary Keywords: "{primary_keywords}"
-    - Secondary Keywords: "{secondary_keywords}"
+### Short Description:
+[ ... 2–3 lines summary ...]
 
-    **Source Content (from web scraping):**
-    --- WEB CONTEXT ---
-    {web_context}
-    --- END WEB CONTEXT ---
+### Description:
+[ ... key features and details, single block ... ]
 
-    **Google Shopping Scraped Data (for pricing/UPC extraction):**
-    --- USA SHOPPING CONTEXT ---
-    {shopping_context_us}
-    --- END USA SHOPPING CONTEXT ---
+### How to Use:
+[ ... step-by-step usage instructions ... ]
 
-    --- CANADA SHOPPING CONTEXT ---
-    {shopping_context_ca}
-    --- END CANADA SHOPPING CONTEXT ---
+Your rewrite must:
+1. Preserve all headings and their order.
+2. Use varied sentence lengths and rhythm: mix short punchy lines with longer ones.
+3. Avoid cliché marketing phrases (“Get ready for...”, “This isn’t your average…”, etc.).
+4. Inject subtle, natural imperfections: mild colloquialisms (“a bit”, “kind of”), contractions (“you’ll”, “it’s”), and even occasional minor typos or slight grammatical quirks.
+5. Include a rhetorical question or two (e.g., “Want fuller hair?”, “Need something easy?”) — humans often use them casually.
+6. Use grounded, specific detail — not vague superlatives.
+7. Avoid repeating keywords or terms in close proximity.
+8. Add tiny personal touches or relatable imagery — but don’t turn it into a story or blog post.
+9. Don’t over‑optimize for SEO; write for humans, not machines.
+10. Maintain clarity and professionalism — readable, easy to skim.
 
-    **Your Task:**
-    Based on all the provided information, generate a JSON object with the following structure and adhere to all constraints. Do not include any text outside of the JSON object.
+Here’s the original description:
 
-    {{
-      "meta_title": "string",
-      "meta_description": "string",
-      "short_description": "string",
-      "description": "string",
-      "how_to_use": "string",
-      "ingredients": "string",
-      "upc": "string",
-      "usa_prices": {{
-        "highest": "string",
-        "lowest": "string"
-      }},
-      "canada_prices": {{
-        "highest": "string",
-        "lowest": "string"
-      }}
-    }}
+[PASTE AI‑GENERATED PRODUCT DESCRIPTION HERE]
 
-    **Content Constraints and Instructions:**
-
-    1.  **meta_title**:
-        - Length: 50-60 characters MAXIMUM.
-        - Content: Must include the most important primary keywords at the beginning. Be concise and compelling.
-
-    2.  **meta_description**:
-        - Length: 120-160 characters MAXIMUM.
-        - Content: Include 1-2 primary keywords and create an engaging summary to encourage clicks.
-
-    3.  **short_description**:
-        - Length: 50-160 words (2-4 sentences).
-        - Content: Use one or two primary keywords and 1-2 secondary keywords naturally. Do not stuff keywords. Write in a human, engaging tone.
-
-    4.  **description**:
-        - Length: 300-350 words.
-        - Content: This is the main body. It should be well-structured and persuasive.
-        - Address the target problem the product solves.
-        - Highlight the key benefits and features.
-        - Incorporate primary and secondary keywords naturally throughout the text.
-        - Use a human-like, slightly informal, and trustworthy tone. Use varied sentence structures. Avoid marketing cliches.
-
-    5.  **how_to_use**:
-        - Content: Provide simple, clear, step-by-step instructions for using the product.
-
-    6.  **ingredients**:
-        - Content: Based on the web context, list the main active or key ingredients. If you cannot find any, state "Ingredients not available online.". Conclude with the note: "For a complete list of ingredients, please refer to the product packaging."
-
-    7.  **upc**:
-        - Content: Extract the product's UPC (Universal Product Code) from the shopping context. If multiple are found, list the most likely one. If none is found, return "Not found".
-
-    8.  **usa_prices** & **canada_prices**:
-        - Content: From the respective shopping contexts, identify the highest and lowest prices.
-        - Format as a string, e.g., "$25.99 USD" or "$32.50 CAD".
-        - If no prices can be reliably determined, return "Not found".
-
-    Generate only the JSON object as your response.
+    {ai_description}
     """
 
-def generate_content_with_gemini(prompt: str) -> dict:
-    """
-    Calls the Gemini API to generate the product content and parses the JSON response.
-    """
+# 🤖 Humanize AI Output
+def humanize_text_with_gemini(text):
     try:
-        model = genai.GenerativeModel("gemini-1.5-pro-latest")
-        response = model.generate_content(prompt)
-        
-        # Clean the response to ensure it's valid JSON
-        text_response = response.text.strip()
-        # Find the start and end of the JSON object
-        json_start = text_response.find('{')
-        json_end = text_response.rfind('}') + 1
-        
-        if json_start != -1 and json_end != 0:
-            json_str = text_response[json_start:json_end]
-            return json.loads(json_str)
-        else:
-            return {"error": "Failed to parse valid JSON from the AI response."}
-
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt_text = build_humanizer_prompt(text)
+        response = model.generate_content(prompt_text)
+        return response.text
     except Exception as e:
-        st.error(f"Error during AI content generation: {e}")
-        return {"error": str(e)}
-
-# --- Data Persistence ---
-
-def save_to_huggingface(product_name: str, generated_data: dict):
-    """Saves the generated data to a Hugging Face dataset."""
-    if not HF_TOKEN:
-        st.warning("Hugging Face token not found. Skipping dataset save.")
-        return
-
+        return f"[ERROR]: {str(e)}"
+    
+# 💾 Save to HF Dataset
+def save_to_huggingface_dataset(product_name, description):
+    new_data = Dataset.from_dict({
+        "product_name": [product_name],
+        "description": [description]
+    })
     try:
-        # Convert the dictionary to a JSON string for the 'description' column
-        data_to_save = {
-            "product_name": [product_name],
-            "description": [json.dumps(generated_data)]
-        }
-        new_hf_dataset = Dataset.from_dict(data_to_save)
+        existing = load_dataset(HF_DATASET_NAME, split="train")
+        combined = concatenate_datasets([existing, new_data])
+    except:
+        combined = new_data
 
-        # Append to the existing dataset
-        new_hf_dataset.push_to_hub(HF_DATASET_NAME, token=HF_TOKEN)
-        st.success(f"Successfully saved to Hugging Face Dataset: {HF_DATASET_NAME}")
+    combined.push_to_hub(HF_DATASET_NAME, split="train", private=False)
 
-    except Exception as e:
-        st.error(f"Failed to save to Hugging Face Hub: {e}")
+# 🚀 Streamlit UI
+st.set_page_config(page_title="ProductSense", page_icon="🛍️", layout="wide")
+st.title("🛍️ ProductSense: AI-Powered Product Descriptions")
+st.markdown("Enter a product name to scrape the web and generate a description.")
 
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
 
-# --- Streamlit User Interface ---
+with st.form("product_form"):
+    product_name = st.text_input("Enter product name (e.g., Sebastian Volupt Shampoo 250ml):")
+    submitted = st.form_submit_button("Generate Description")
 
-st.set_page_config(page_title="ProductSense AI Agent", page_icon="🛍️", layout="wide")
+if submitted and product_name:
+    st.session_state.submitted = True
+    st.session_state.product_name = product_name
+elif submitted and not product_name:
+    st.warning("Please enter a product name.")
+    st.session_state.submitted = False
 
-st.title("🛍️ ProductSense AI Agent")
-st.markdown("Enter product details to generate a complete, SEO-optimized product listing using AI.")
+if st.session_state.submitted and product_name:
+    async def run():
+        with st.spinner("Searching and scraping..."):
+            urls = await search_product_links(product_name, max_links=10)
+            print(urls)
+            descriptions = []
+            metadata = []
+            async with aiohttp.ClientSession() as session:
+                scrape_tasks = [extract_product_info(session, url) for url in urls]
+                scraped_data = await asyncio.gather(*scrape_tasks)
+                for raw in scraped_data:
+                    if 'error' not in raw:
+                        descriptions.append(raw['long_desc'])
+                        metadata.append(raw)
+                    else:
+                        metadata.append(raw)
 
-with st.form("product_agent_form"):
-    st.subheader("1. Input Product Details")
-    product_name = st.text_input(
-        "**Product Name**",
-        placeholder="e.g., Fanola No Yellow Shampoo 350 ml",
-        help="The full, specific name of the product."
-    )
-    primary_keywords = st.text_input(
-        "**Primary Keywords**",
-        placeholder="e.g., Shampoo, violet shampoo, toning shampoo",
-        help="The most important keywords for your product."
-    )
-    secondary_keywords = st.text_input(
-        "**Secondary Keywords**",
-        placeholder="e.g., hair care, colored hair, brassy hair treatment",
-        help="Related keywords that add context."
-    )
-    
-    submit_button = st.form_submit_button("✨ Generate Product Listing")
+            ai_summary = await generate_aggregated_description(product_name, descriptions)
+            human_like_summary = humanize_text_with_gemini(ai_summary)
+            save_to_huggingface_dataset(product_name, human_like_summary)
+            return human_like_summary, metadata
 
-if submit_button and product_name and primary_keywords:
-    
-    st.markdown("---")
-    st.subheader("2. AI Processing and Generation")
-    
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-
-    async def main_process():
-        # Step 1: Web Scraping for general content
-        status_text.info("🔍 Searching Google for product pages...")
-        links = await get_search_links(product_name, num_links=5)
-        if not links:
-            st.error("Could not find any relevant web pages. Please check the product name.")
-            return None
-        progress_bar.progress(10)
-
-        status_text.info(f"🕷️ Scraping {len(links)} web pages for content...")
-        async with aiohttp.ClientSession() as session:
-            tasks = [scrape_page_content(session, link) for link in links]
-            results = await asyncio.gather(*tasks)
-        
-        web_context = "\n\n".join(
-            f"--- Source: {res['url']} ---\n{res['content']}"
-            for res in results if "content" in res
-        )
-        progress_bar.progress(30)
-
-        # Step 2: Scraping Google Shopping for US and CA
-        status_text.info("🇺🇸 Fetching USA shopping data...")
-        shopping_context_us = await get_shopping_data(product_name, "us")
-        progress_bar.progress(50)
-
-        status_text.info("🇨🇦 Fetching Canada shopping data...")
-        shopping_context_ca = await get_shopping_data(product_name, "ca")
-        progress_bar.progress(70)
-
-        # Step 3: AI Content Generation
-        status_text.info("🧠 Building prompt and calling AI model... This may take a moment.")
-        master_prompt = build_master_prompt(
-            product_name, primary_keywords, secondary_keywords, 
-            web_context, shopping_context_us, shopping_context_ca
-        )
-        
-        # For debugging the prompt
-        with st.expander("Show Master Prompt Sent to AI"):
-            st.text(master_prompt)
-
-        generated_data = generate_content_with_gemini(master_prompt)
-        progress_bar.progress(100)
-        status_text.success("✅ Content generation complete!")
-        
-        return generated_data
-
-    # Run the main async process
-    final_data = asyncio.run(main_process())
-
-    if final_data and "error" not in final_data:
-        st.markdown("---")
-        st.subheader("3. Generated Product Listing")
-
-        # Displaying the results in a structured and clean way
-        st.text_input("Meta Title", value=final_data.get("meta_title", ""), disabled=True)
-        st.text_area("Meta Description", value=final_data.get("meta_description", ""), height=100, disabled=True)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info("🇺🇸 USA Pricing")
-            st.metric("Lowest Price", final_data.get("usa_prices", {}).get("lowest", "N/A"))
-            st.metric("Highest Price", final_data.get("usa_prices", {}).get("highest", "N/A"))
-        with col2:
-            st.info("🇨🇦 Canada Pricing")
-            st.metric("Lowest Price", final_data.get("canada_prices", {}).get("lowest", "N/A"))
-            st.metric("Highest Price", final_data.get("canada_prices", {}).get("highest", "N/A"))
-
-        st.markdown(f"**UPC:** `{final_data.get('upc', 'Not found')}`")
-        
-        st.markdown("### Short Description")
-        st.markdown(final_data.get("short_description", ""))
-
-        st.markdown("### Full Description")
-        st.markdown(final_data.get("description", ""))
-
-        st.markdown("### How to Use")
-        st.markdown(final_data.get("how_to_use", ""))
-
-        st.markdown("### Key Ingredients")
-        st.warning(final_data.get("ingredients", ""))
-
-        # Step 4: Save to Hugging Face
-        save_to_huggingface(product_name, final_data)
-
-    elif final_data and "error" in final_data:
-        st.error(f"An error occurred: {final_data['error']}")
-    else:
-        st.error("The process failed to generate data. Please try again.")
-
-elif submit_button:
-    st.warning("Please fill in both Product Name and Primary Keywords.")
+    summary, sources = asyncio.run(run())
+    st.subheader("📝 Final Product Description")
+    st.write(summary)
+    st.session_state.submitted = False
