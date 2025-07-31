@@ -22,6 +22,9 @@ from datasets import Dataset, load_dataset, concatenate_datasets
 
 
 # --- Configuration & Initialization ---
+import os
+os.system('playwright install')
+
 # Configure the Gemini API key
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])

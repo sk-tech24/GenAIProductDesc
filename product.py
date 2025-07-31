@@ -9,8 +9,8 @@ import asyncio
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
-# import os
-# os.system('playwright install')
+import os
+os.system('playwright install')
 
 # 🔍 Google Search
 async def search_product_links(product_name: str, max_links=5):
