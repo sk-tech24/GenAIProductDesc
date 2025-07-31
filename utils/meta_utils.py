@@ -6,15 +6,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote
 
 
-def extract_meta_title_description(product_title: str, primary_keyword: str, secondary_keyword: str) -> tuple[str, str]:
-    meta_title = f"Buy {product_title} - {primary_keyword} | Best Price Online"
-    meta_description = (
-        f"Shop {product_title} online at the best price. Discover more about {secondary_keyword}, "
-        f"benefits, usage, and ingredients. Fast delivery and genuine products."
-    )
-    return meta_title, meta_description
-
-def find_upc_by_product_name(product_name, max_results=5, validate_check_digit=True):
+def find_upc_by_product_name(product_name, max_results=5, validate_check_digit=False):
     """
     Search Google results for product pages and extract a 12-digit UPC (UPC-A).
     Returns the first valid UPC found, or "UPC Not Found".
@@ -22,7 +14,7 @@ def find_upc_by_product_name(product_name, max_results=5, validate_check_digit=T
     headers = {"User-Agent": "Mozilla/5.0"}
     query = requests.utils.quote(product_name)
     search_url = f"https://www.google.com/search?q={query}"
-    r = requests.get(search_url, headers=headers, timeout=10)
+    r = requests.get(search_url, headers=headers)
     soup = BeautifulSoup(r.text, "html.parser")
     
     # Extract result URLs
