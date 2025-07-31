@@ -38,33 +38,54 @@ HF_TOKEN = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
 
 
 # --- Web Scraping and Data Extraction Modules ---
-async def get_search_links(query: str, num_links: int = 5) -> list:
-    """
-    Uses Playwright to perform a Google search and return top organic results.
-    Filters out common non-product domains.
-    """
-    links = []
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            await page.goto(f"https://www.google.com/search?q={query.replace(' ', '+')}")
-            await page.wait_for_selector('div#search', state='attached', timeout=10000)
+# 🔍 Google Search
+async def get_search_links(query, max_links=5):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto(f"https://www.google.com/search?q={query}")
+        await page.wait_for_timeout(2000)
+        elements = await page.query_selector_all("a")
+        links = []
+        for e in elements:
+            href = await e.get_attribute("href")
+            if href and href.startswith("/url?q="):
+                clean_link = href.split("/url?q=")[1].split("&")[0]
+                if ("google" not in clean_link and not clean_link.startswith("#") and
+                    not any(domain in clean_link for domain in ["youtube.com", "facebook.com", "instagram.com"])):
+                    links.append(clean_link)
+            if len(links) >= max_links:
+                break
+        await browser.close()
+        return links
 
-            elements = await page.query_selector_all("a")
-            for element in elements:
-                href = await element.get_attribute("href")
-                if href and href.startswith("/url?q="):
-                    clean_link = href.split("/url?q=")[1].split("&")[0]
-                    # Filter out irrelevant domains
-                    if not any(domain in clean_link for domain in ["google.com", "youtube.com", "facebook.com", "instagram.com", "pinterest.com"]):
-                        links.append(clean_link)
-                if len(links) >= num_links:
-                    break
-            await browser.close()
-    except Exception as e:
-        st.error(f"An error occurred during web search: {e}")
-    return links
+# async def get_search_links(query: str, num_links: int = 5) -> list:
+#     """
+#     Uses Playwright to perform a Google search and return top organic results.
+#     Filters out common non-product domains.
+#     """
+#     links = []
+#     try:
+#         async with async_playwright() as p:
+#             browser = await p.chromium.launch(headless=True)
+#             page = await browser.new_page()
+#             await page.goto(f"https://www.google.com/search?q={query.replace(' ', '+')}")
+#             await page.wait_for_selector('div#search', state='attached', timeout=10000)
+
+#             elements = await page.query_selector_all("a")
+#             for element in elements:
+#                 href = await element.get_attribute("href")
+#                 if href and href.startswith("/url?q="):
+#                     clean_link = href.split("/url?q=")[1].split("&")[0]
+#                     # Filter out irrelevant domains
+#                     if not any(domain in clean_link for domain in ["google.com", "youtube.com", "facebook.com", "instagram.com", "pinterest.com"]):
+#                         links.append(clean_link)
+#                 if len(links) >= num_links:
+#                     break
+#             await browser.close()
+#     except Exception as e:
+#         st.error(f"An error occurred during web search: {e}")
+#     return links
 
 async def scrape_page_content(session: aiohttp.ClientSession, url: str) -> dict:
     """
