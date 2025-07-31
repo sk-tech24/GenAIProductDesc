@@ -50,7 +50,6 @@ class AIContentGenerator:
             
             response = requests.post(
                 "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1",
-                headers={"Authorization": "Bearer hf_demo"},
                 json=payload,
                 timeout=30
             )
