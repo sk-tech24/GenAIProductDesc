@@ -39,7 +39,7 @@ HF_TOKEN = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
 
 # --- Web Scraping and Data Extraction Modules ---
 # 🔍 Google Search
-async def get_search_links(query, max_links=5):
+async def get_search_links(query, num_links=5):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -54,7 +54,7 @@ async def get_search_links(query, max_links=5):
                 if ("google" not in clean_link and not clean_link.startswith("#") and
                     not any(domain in clean_link for domain in ["youtube.com", "facebook.com", "instagram.com"])):
                     links.append(clean_link)
-            if len(links) >= max_links:
+            if len(links) >= num_links:
                 break
         await browser.close()
         return links
