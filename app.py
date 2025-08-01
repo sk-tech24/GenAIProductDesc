@@ -758,5 +758,5 @@ def main():
     # </div>
     # """, unsafe_allow_html=True)
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
