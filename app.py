@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import re
 import random
 import time
-from urllib.parse
+import urllib.parse
 import json
 from typing import Dict, List, Tuple
 from dataclasses import dataclass
