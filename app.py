@@ -701,38 +701,38 @@ def main():
             with col3:
                 # Detailed text report
                 text_report = f"""AI PRODUCT RESEARCH REPORT
-{'='*50}
+                            {'='*50}
 
-PRODUCT: {product_name}
-RESEARCH DATE: {time.strftime("%Y-%m-%d %H:%M:%S")}
-UPC CODE: {results.upc}
+                            PRODUCT: {product_name}
+                            RESEARCH DATE: {time.strftime("%Y-%m-%d %H:%M:%S")}
+                            UPC CODE: {results.upc}
 
-KEYWORDS:
-Primary: {primary_keywords}
-Secondary: {secondary_keywords}
+                            KEYWORDS:
+                            Primary: {primary_keywords}
+                            Secondary: {secondary_keywords}
 
-SEO METADATA:
-Meta Title ({len(results.meta_title)} chars): {results.meta_title}
-Meta Description ({len(results.meta_description)} chars): {results.meta_description}
+                            SEO METADATA:
+                            Meta Title ({len(results.meta_title)} chars): {results.meta_title}
+                            Meta Description ({len(results.meta_description)} chars): {results.meta_description}
 
-PRODUCT DESCRIPTIONS:
-Short Description ({len(results.short_description.split())} words):
-{results.short_description}
+                            PRODUCT DESCRIPTIONS:
+                            Short Description ({len(results.short_description.split())} words):
+                            {results.short_description}
 
-Full Description ({len(results.full_description.split())} words):
-{results.full_description}
+                            Full Description ({len(results.full_description.split())} words):
+                            {results.full_description}
 
-USAGE INSTRUCTIONS:
-{results.how_to_use}
+                            USAGE INSTRUCTIONS:
+                            {results.how_to_use}
 
-INGREDIENTS:
-{results.ingredients}
+                            INGREDIENTS:
+                            {results.ingredients}
 
-PRICING ANALYSIS:
-Canada - Highest: {results.pricing['canada']['highest']} | Lowest: {results.pricing['canada']['lowest']}
-USA - Highest: {results.pricing['usa']['highest']} | Lowest: {results.pricing['usa']['lowest']}
+                            PRICING ANALYSIS:
+                            Canada - Highest: {results.pricing['canada']['highest']} | Lowest: {results.pricing['canada']['lowest']}
+                            USA - Highest: {results.pricing['usa']['highest']} | Lowest: {results.pricing['usa']['lowest']}
 
-"""
+                            """
                 
                 st.download_button(
                     "📄 Download Report",
@@ -751,12 +751,12 @@ USA - Highest: {results.pricing['usa']['highest']} | Lowest: {results.pricing['u
 
     # Footer
     st.markdown("---")
-    st.markdown("""
-    <div style='text-align: center; color: #666;'>
-        <p><strong>🤖 Powered by Advanced Web Scraping + AI Content Generation</strong></p>
-        <p>Combines real-time web data with AI-powered natural language generation</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <div style='text-align: center; color: #666;'>
+    #     <p><strong>🤖 Powered by Advanced Web Scraping + AI Content Generation</strong></p>
+    #     <p>Combines real-time web data with AI-powered natural language generation</p>
+    # </div>
+    # """, unsafe_allow_html=True)
 
 # if __name__ == "__main__":
 #     main()
