@@ -82,32 +82,41 @@ class ProductResearchAgent:
         self.ai_generator = AIContentGenerator()
 
     async def search_google_links(self, query, max_links=5):
-        logger.info(f"🔍 Searching Google for: {query}")
+        logger.info(f"🔍 Starting enhanced Google search for: {query}")
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
-                encoded_query = urllib.parse.quote_plus(query)
-                await page.goto(f"https://www.google.com/search?q={encoded_query}", timeout=15000)
-                await page.wait_for_selector("a")
 
-                elements = await page.query_selector_all("a")
+                await page.goto("https://www.google.com", timeout=15000)
+                # Accept cookie/banner if shown
+                try:
+                    await page.click('button:has-text("I agree")', timeout=5000)
+                    logger.info("✔️ Clicked Google consent")
+                except:
+                    pass
+
+                await page.fill('input[name="q"]', query, timeout=10000)
+                await page.press('input[name="q"]', 'Enter')
+                logger.info("✏️ Typed query and hit Enter")
+
+                await page.wait_for_selector('div.yuRUbf > a', timeout=10000)
+                anchors = await page.query_selector_all('div.yuRUbf > a')
                 links = []
-                for e in elements:
-                    href = await e.get_attribute("href")
-                    if href and href.startswith("/url?q="):
-                        clean_link = href.split("/url?q=")[1].split("&")[0]
-                        if ("google" not in clean_link and not clean_link.startswith("#") and
-                            not any(domain in clean_link for domain in ["youtube.com", "facebook.com", "instagram.com"])):
-                            links.append(clean_link)
-                            logger.info(f"✅ Google Link: {clean_link}")
+
+                for a in anchors:
+                    href = await a.get_attribute('href')
+                    if href and href.startswith("http"):
+                        links.append(href)
+                        logger.info(f"✅ Extracted Google result link: {href}")
                     if len(links) >= max_links:
                         break
+
                 await browser.close()
-                logger.info(f"✅ Returning {len(links)} Google links.")
+                logger.info(f"✅ Google returned {len(links)} links.")
                 return links
         except Exception as e:
-            logger.warning(f"⚠️ Google search failed: {e}")
+            logger.warning(f"⚠️ Google enhanced search failed: {e}")
             return []
 
     async def search_duckduckgo_links(self, query, max_links=5):
@@ -145,21 +154,20 @@ class ProductResearchAgent:
             results = asyncio.run(self.search_duckduckgo_links(query, max_links=num_results))
         return results
 
-    def build_search_queries(self, product_name: str, primary_keywords: str, secondary_keywords: str = "") -> List[str]:
-        logger.info("🛠️ Building enhanced search queries...")
+    def build_search_queries(self, product_name, primary_keywords, secondary_keywords=""):
+        logger.info("🧠 Building smarter search queries tuned for required output")
         queries = [
-            f"{product_name} product price Canada USA USD CAD site:amazon.com",
-            f"{product_name} active ingredients UPC barcode packaging details",
-            f"{product_name} customer reviews features specifications site:trustpilot.com",
-            f"{product_name} buy online offers shipping return policy",
-            f"how to use {product_name} user instructions dosage",
-            f"{product_name} meta title meta description short description site:wikipedia.org",
-            f"{primary_keywords.split(',')[0]} benefits of {product_name} explained",
-            f"{product_name} alternative names brand names UPC comparison",
-            f"{product_name} side effects vs benefits reviews",
-            f"{product_name} high price low price site:amazon.ca OR site:walmart.com"
+            f"{product_name} price Canada USD CAD Amazon",
+            f"{product_name} ingredients UPC barcode packaging",
+            f"{product_name} customer review features specifications",
+            f"{product_name} buy online product details shipping policy",
+            f"how to use {product_name} instructions directions",
+            f"{product_name} short description meta title meta description",
+            f"{primary_keywords.split(',')[0]} benefits {product_name} explained",
+            f"{product_name} UPC ASIN Amazon",
+            f"{product_name} high price low price comparison",
         ]
-        logger.info(f"✅ Built {len(queries)} queries.")
+        logger.info(f"✅ Built {len(queries)} enhanced queries.")
         return queries
 
     def scrape_website(self, url: str) -> Dict:
