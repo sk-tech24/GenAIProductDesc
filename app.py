@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import re
 import random
 import time
-from urllib.parse import quote_plus
+from urllib.parse
 import json
 from typing import Dict, List, Tuple
 from dataclasses import dataclass
@@ -80,15 +80,16 @@ class ProductResearchAgent:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         self.ai_generator = AIContentGenerator()
-        
+
     async def search_google_links(self, query, max_links=5):
         logger.info(f"🔍 Searching Google for: {query}")
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
-                await page.goto(f"https://www.google.com/search?q={query.replace(' ', '+')}")
-                await page.wait_for_timeout(2000)
+                encoded_query = urllib.parse.quote_plus(query)
+                await page.goto(f"https://www.google.com/search?q={encoded_query}", timeout=15000)
+                await page.wait_for_selector("a")
 
                 elements = await page.query_selector_all("a")
                 links = []
@@ -115,8 +116,9 @@ class ProductResearchAgent:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
-                await page.goto(f"https://duckduckgo.com/?q={query.replace(' ', '+')}&t=h_&ia=web")
-                await page.wait_for_timeout(2000)
+                encoded_query = urllib.parse.quote_plus(query)
+                await page.goto(f"https://duckduckgo.com/?q={encoded_query}&t=h_&ia=web", timeout=15000)
+                await page.wait_for_selector("a")
 
                 elements = await page.query_selector_all("a")
                 links = []
@@ -142,6 +144,23 @@ class ProductResearchAgent:
             logger.info("🕊️ Falling back to DuckDuckGo...")
             results = asyncio.run(self.search_duckduckgo_links(query, max_links=num_results))
         return results
+
+    def build_search_queries(self, product_name: str, primary_keywords: str, secondary_keywords: str = "") -> List[str]:
+        logger.info("🛠️ Building enhanced search queries...")
+        queries = [
+            f"{product_name} product price Canada USA USD CAD site:amazon.com",
+            f"{product_name} active ingredients UPC barcode packaging details",
+            f"{product_name} customer reviews features specifications site:trustpilot.com",
+            f"{product_name} buy online offers shipping return policy",
+            f"how to use {product_name} user instructions dosage",
+            f"{product_name} meta title meta description short description site:wikipedia.org",
+            f"{primary_keywords.split(',')[0]} benefits of {product_name} explained",
+            f"{product_name} alternative names brand names UPC comparison",
+            f"{product_name} side effects vs benefits reviews",
+            f"{product_name} high price low price site:amazon.ca OR site:walmart.com"
+        ]
+        logger.info(f"✅ Built {len(queries)} queries.")
+        return queries
 
     def scrape_website(self, url: str) -> Dict:
         """Scrape individual website for product information"""
@@ -414,14 +433,7 @@ IMPORTANT:
         print(product_name, primary_keywords, secondary_keywords)
         
         # Create search queries
-        search_queries = [
-            f"{product_name} price Canada USA",
-            f"{product_name} ingredients UPC barcode",
-            f"{product_name} review specifications features",
-            f'"{product_name}" buy online',
-            f"{primary_keywords.split(',')[0]} {product_name}",
-            f"{product_name} how to use instructions"
-        ]
+        search_queries = self.build_search_queries(product_name, primary_keywords, secondary_keywords)
         
         # Progress tracking
         progress_bar = st.progress(0)
