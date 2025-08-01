@@ -34,8 +34,8 @@ class ProductInfo:
 class AIContentGenerator:
     def __init__(self):
         # Using Hugging Face's free inference API
-        self.hf_api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
-        self.headers = {"Authorization": "Bearer hf_demo"}  # Free tier token
+        self.hf_api_url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+        self.headers = {"Authorization": f"Bearer {os.getenv("HF_TOKEN")}", "Content-Type": "application/json"}
 
     def generate_with_huggingface(self, prompt: str) -> str:
         """Generate content using Hugging Face free API"""
@@ -43,15 +43,14 @@ class AIContentGenerator:
             payload = {
                 "inputs": prompt,
                 "parameters": {
-                    "max_new_tokens": 500,
-                    "temperature": 0.7,
-                    "return_full_text": False
+                    "max_new_tokens": 800,
+                    "temperature": 0.7
                 }
             }
             
             response = requests.post(
-                "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1",
-                headers={"Authorization": "Bearer hf_demo"},
+                self.hf_api_url,
+                headers=self.headers,
                 json=payload,
                 timeout=30
             )
@@ -62,7 +61,7 @@ class AIContentGenerator:
                     return result[0].get('generated_text', '').strip()
             return None
         except Exception as e:
-            st.error(f"Hugging Face API error: {str(e)}")
+            st.error(f"❌ Hugging Face API error: {str(e)}")
             return None
 
     def generate_content(self, prompt: str) -> str:
@@ -71,6 +70,7 @@ class AIContentGenerator:
         
         # Try Hugging Face first (most reliable free option)
         result = self.generate_with_huggingface(prompt)
+        logger.info(f"✔️ HuggingFace Chat Model Response: {result}")
         if result:
             return result
 
@@ -148,7 +148,7 @@ class ProductResearchAgent:
 
     def google_search(self, query: str, num_results: int = 8) -> List[str]:
         logger.info(f"🔍 Running unified search for: {query}")
-        results = asyncio.run(self.search_google_links(query, max_links=num_results))
+        results = [] # asyncio.run(self.search_google_links(query, max_links=num_results))
         if not results:
             logger.info("🕊️ Falling back to DuckDuckGo...")
             results = asyncio.run(self.search_duckduckgo_links(query, max_links=num_results))
@@ -461,7 +461,7 @@ IMPORTANT:
                     scraped = self.scrape_website(url)
                     if 'content' in scraped:  # Only add successful scrapes
                         all_scraped_data.append(scraped)
-                    time.sleep(0.5)  # Rate limiting
+                    # time.sleep(0.5)  # Rate limiting
                 except:
                     continue
             
