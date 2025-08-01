@@ -10,8 +10,15 @@ from typing import Dict, List, Tuple
 from dataclasses import dataclass
 import asyncio
 from playwright.async_api import async_playwright
+
 import os
 os.system("playwright install")
+
+import logging
+# Configure logging for Streamlit Cloud visibility
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ProductInfo:
@@ -75,12 +82,12 @@ class ProductResearchAgent:
         self.ai_generator = AIContentGenerator()
         
     async def search_google_links(self, query, max_links=5):
-        print(f"[🔍] Searching Google for: {query}")
+        logger.info(f"🔍 Searching Google for: {query}")
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
-                await page.goto(f"https://www.google.com/search?q={query}")
+                await page.goto(f"https://www.google.com/search?q={query.replace(' ', '+')}")
                 await page.wait_for_timeout(2000)
 
                 elements = await page.query_selector_all("a")
@@ -92,23 +99,23 @@ class ProductResearchAgent:
                         if ("google" not in clean_link and not clean_link.startswith("#") and
                             not any(domain in clean_link for domain in ["youtube.com", "facebook.com", "instagram.com"])):
                             links.append(clean_link)
-                            print(f"[✅] Google Link: {clean_link}")
+                            logger.info(f"✅ Google Link: {clean_link}")
                     if len(links) >= max_links:
                         break
                 await browser.close()
-                print(f"[✅] Returning {len(links)} Google links.")
+                logger.info(f"✅ Returning {len(links)} Google links.")
                 return links
         except Exception as e:
-            print(f"[⚠️] Google search failed: {e}")
+            logger.warning(f"⚠️ Google search failed: {e}")
             return []
 
     async def search_duckduckgo_links(self, query, max_links=5):
-        print(f"[🔍] Searching DuckDuckGo for: {query}")
+        logger.info(f"🔍 Searching DuckDuckGo for: {query}")
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
-                await page.goto(f"https://duckduckgo.com/?q={query}&t=h_&ia=web")
+                await page.goto(f"https://duckduckgo.com/?q={query.replace(' ', '+')}&t=h_&ia=web")
                 await page.wait_for_timeout(2000)
 
                 elements = await page.query_selector_all("a")
@@ -118,21 +125,21 @@ class ProductResearchAgent:
                     if href and href.startswith("http"):
                         if not any(domain in href for domain in ["duckduckgo.com", "youtube.com", "facebook.com", "instagram.com"]):
                             links.append(href)
-                            print(f"[✅] DuckDuckGo Link: {href}")
+                            logger.info(f"✅ DuckDuckGo Link: {href}")
                     if len(links) >= max_links:
                         break
                 await browser.close()
-                print(f"[✅] Returning {len(links)} DuckDuckGo links.")
+                logger.info(f"✅ Returning {len(links)} DuckDuckGo links.")
                 return links
         except Exception as e:
-            print(f"[⚠️] DuckDuckGo search failed: {e}")
+            logger.warning(f"⚠️ DuckDuckGo search failed: {e}")
             return []
 
     def google_search(self, query: str, num_results: int = 8) -> List[str]:
-        print(f"[🔍] Running unified search for: {query}")
+        logger.info(f"🔍 Running unified search for: {query}")
         results = asyncio.run(self.search_google_links(query, max_links=num_results))
         if not results:
-            print("[🕊️] Falling back to DuckDuckGo...")
+            logger.info("🕊️ Falling back to DuckDuckGo...")
             results = asyncio.run(self.search_duckduckgo_links(query, max_links=num_results))
         return results
 
